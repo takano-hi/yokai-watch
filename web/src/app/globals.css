@@ -93,6 +93,18 @@ button { -webkit-tap-highlight-color: transparent; }
 .title-flame-cutout { fill: #87c8ec; opacity: .8; }
 .page-heading h1 span:first-child { font-size: 1em; }
 .page-heading h1 span:last-child { font-size: .94em; }
+.page-heading .brand-logo-heading {
+  display: block;
+  flex: 0 1 auto;
+  max-width: 100%;
+  line-height: 0;
+  text-shadow: none;
+}
+.page-heading .brand-logo {
+  display: block;
+  width: min(86vw, 500px);
+  height: auto;
+}
 
 .photo-frame {
   position: relative;
@@ -266,6 +278,8 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .page-heading-compact h1 span:last-child { font-size: .92em; }
+.page-heading-compact .brand-logo { width: min(88%, 400px); }
+.result-banner .page-heading-compact .brand-logo { width: min(56vw, 280px); }
 .page-heading-compact .title-flame { width: 5vw; height: 8vw; }
 .page-heading-compact .title-flame-left { left: 31%; }
 .page-heading-compact .title-flame-right { right: 31%; }
