@@ -27,7 +27,7 @@ function sanitizeErrorDetail(value: unknown): string | null {
   return redacted.replace(/data:image\/[^\s"']+/g, "[REDACTED_IMAGE]").slice(0, 2_000);
 }
 
-async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, size?: string, referenceImageBase64?: string) {
+async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, referenceImageBase64?: string) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CHATGPT_API_KEY}` },
@@ -39,7 +39,10 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, siz
         ...(referenceImageBase64 ? [{ type: "input_image", image_url: `data:image/png;base64,${referenceImageBase64}` }] : []),
         { type: "input_text", text: prompt },
       ] }],
-      tools: [{ type: "image_generation", model: "gpt-image-2.5-sunburst", background: "transparent", output_format: "png", ...(size && { size }) }],
+      tools: [{
+        type: "image_generation", model: "gpt-image-2.5-flare", quality: "medium", size: "1024x1024",
+        background: "transparent", output_format: "png",
+      }],
     }),
   });
   if (!response.ok) {
@@ -91,7 +94,7 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
     const character = await callOpenAI(input, IMAGE_PROMPTS.character(input.name, input.personality), generationSignal);
     const medal = await loadReferenceImage("medal").then((referenceImage) => callOpenAI(
       { ...input, bytes: character.bytes, mimeType: "image/png" },
-      IMAGE_PROMPTS.medal, generationSignal, "1024x1024", referenceImage,
+      IMAGE_PROMPTS.medal, generationSignal, referenceImage,
     )).catch((error: unknown) => {
       if (overallSignal.aborted) throw error;
       console.warn("medal_generation_failed", {

@@ -87,7 +87,10 @@ describe("generateAndSaveImages", () => {
     expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photo.toString("base64")}`);
     expect(bodies[0].input[0].content).toHaveLength(2);
     expect(bodies[0].model).toBe("gpt-6-luna");
-    expect(bodies[0].tools[0]).toMatchObject({ type: "image_generation", model: "gpt-image-2.5-sunburst", background: "transparent", output_format: "png" });
+    expect(bodies[0].tools[0]).toEqual({
+      type: "image_generation", model: "gpt-image-2.5-flare", quality: "medium", size: "1024x1024",
+      background: "transparent", output_format: "png",
+    });
     expect(loadReferenceImage).toHaveBeenCalledExactlyOnceWith("medal");
     expect(bodies[1].input[0].content).toEqual([
       { type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` },
@@ -95,7 +98,10 @@ describe("generateAndSaveImages", () => {
       { type: "input_text", text: expect.stringContaining("同一のキャラクター") },
     ]);
     expect(bodies[1].model).toBe("gpt-6-luna");
-    expect(bodies[1].tools[0]).toMatchObject({ type: "image_generation", model: "gpt-image-2.5-sunburst", background: "transparent", output_format: "png", size: "1024x1024" });
+    expect(bodies[1].tools[0]).toEqual({
+      type: "image_generation", model: "gpt-image-2.5-flare", quality: "medium", size: "1024x1024",
+      background: "transparent", output_format: "png",
+    });
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}.png`, png, "image/png", expect.any(AbortSignal));
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}-medal.png`, medalPng, "image/png", expect.any(AbortSignal));
     expect(result.skill).toBe("とくぎ");
