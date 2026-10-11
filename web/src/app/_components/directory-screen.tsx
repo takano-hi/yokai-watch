@@ -1,4 +1,4 @@
-import type { Monster } from "@/lib/api";
+import { getMonsterImageUrl, type Monster } from "@/lib/api";
 import { BrandMark } from "./brand-mark";
 
 const directoryCss = `
@@ -40,7 +40,7 @@ export function DirectoryScreen({ monsters, onSelect, onBack }: DirectoryScreenP
             {monsters.map((monster) => (
               <button className="monster-card" key={monster.id} onClick={() => onSelect(monster)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/result-sample.png" alt="" />
+                <img src={getMonsterImageUrl(monster.imageFilename) ?? "/hero-sample.jpg"} alt="" />
                 <div><span>なかま妖怪</span><h3>{monster.name}</h3></div>
                 <span className="monster-card-arrow" aria-hidden="true">›</span>
               </button>

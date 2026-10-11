@@ -5,7 +5,7 @@ import { CreateScreen } from "./_components/create-screen";
 import { DirectoryScreen } from "./_components/directory-screen";
 import { MonsterDetailScreen } from "./_components/monster-detail-screen";
 import { ResultScreen } from "./_components/result-screen";
-import { postMonster, type Monster } from "@/lib/api";
+import { getMonsters, postMonster, type Monster } from "@/lib/api";
 
 type ViewStatus = "idle" | "sending" | "done" | "error" | "directory" | "detail";
 
@@ -40,9 +40,8 @@ export default function Home() {
     if (status !== "directory") return;
     let cancelled = false;
 
-    fetch("/api/monsters")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((monsters: Monster[]) => {
+    getMonsters()
+      .then((monsters) => {
         if (!cancelled) setDirectory(Array.isArray(monsters) ? monsters : []);
       })
       .catch(() => {
