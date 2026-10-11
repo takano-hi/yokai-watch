@@ -85,7 +85,6 @@ async function callOpenAI(
       {
         type: "image_generation",
         ...(size && { size }),
-        background: "transparent",
       },
     ],
   });
