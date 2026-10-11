@@ -30,6 +30,10 @@ export function getMonsterImageUrl(filename: string | null): string | null {
   return R2_BASE_URL ? `${R2_BASE_URL}/${key}` : `/${key}`;
 }
 
+export function getMedalImageUrl(medalFilename: string): string {
+  return getMonsterImageUrl(medalFilename) ?? `/${medalFilename}`;
+}
+
 export async function postMonster(
   name: string,
   file: File

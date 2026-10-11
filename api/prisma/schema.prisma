@@ -21,7 +21,8 @@ model Monster {
   name           String
   imageFilename  String
   medalFilename  String?
-  description    String?
+  skill          String  @default("")
+  personality    String  @default("")
   book           Book?   @relation(fields: [bookId], references: [id])
 
   @@map("monsters")
