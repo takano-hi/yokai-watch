@@ -17,6 +17,7 @@ export default function Home() {
   const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
   const [status, setStatus] = useState<ViewStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [personality, setPersonality] = useState("");
 
   useEffect(() => {
     if (!preview) return;
@@ -79,12 +80,14 @@ export default function Home() {
     <CreateScreen
       name={name}
       preview={preview}
-      canSubmit={Boolean(photo && name.trim())}
+      canSubmit={Boolean(photo && name.trim() && personality.trim())}
       isSending={status === "sending"}
       errorMessage={status === "error" ? errorMessage : ""}
       onCapture={handleCapture}
       onNameChange={setName}
       onSubmit={handleSubmit}
+      personality={personality}
+      onPersonalityChange={setPersonality}
     />
   );
 }

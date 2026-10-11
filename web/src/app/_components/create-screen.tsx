@@ -10,6 +10,8 @@ type CreateScreenProps = {
   onCapture: (file: File) => void;
   onNameChange: (name: string) => void;
   onSubmit: () => void;
+  personality: string;
+  onPersonalityChange: (personality: string)=>void;
 };
 
 export function CreateScreen({
@@ -21,6 +23,8 @@ export function CreateScreen({
   onCapture,
   onNameChange,
   onSubmit,
+  personality,
+  onPersonalityChange
 }: CreateScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +80,17 @@ export function CreateScreen({
             <span className="name-sparkle" aria-hidden="true">✧</span>
           </label>
 
+          <label className="name-field">
+            <input
+              type="text"
+              placeholder="その人を一言で表すと？"
+              value={personality}
+              onChange={(event) => onPersonalityChange(event.target.value)}
+              maxLength={40}
+              autoComplete="off"
+            />
+          </label>
+          
           <button
             className="submit-button"
             onClick={onSubmit}
