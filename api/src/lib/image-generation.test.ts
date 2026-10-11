@@ -29,6 +29,42 @@ beforeEach(() => {
 });
 
 describe("generateAndSaveImages", () => {
+  it("OpenAIのエラー詳細とリクエストIDを記録し、既存のエラーを返す", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: {
+      message: "Unsupported background", param: "tools[0].background", code: "invalid_value",
+      extra: "do not log",
+    } }, { status: 400, headers: { "x-request-id": "req-test" } }));
+
+    await expect(generateAndSaveImages(input)).rejects.toMatchObject({ status: 422, code: "OPENAI_HTTP_400" });
+    expect(console.error).toHaveBeenCalledWith("openai_request_failed", {
+      id: input.id, status: 400, requestId: "req-test", message: "Unsupported background",
+      param: "tools[0].background", code: "invalid_value",
+    });
+    expect(uploadImage).not.toHaveBeenCalled();
+  });
+
+  it.each(["not JSON", "null", '{"error":"unexpected"}'])("エラー本文が不正でもHTTPエラーを維持する: %s", async (body) => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status: 403 }));
+    await expect(generateAndSaveImages(input)).rejects.toMatchObject({ status: 503, code: "OPENAI_HTTP_403" });
+    expect(console.error).toHaveBeenCalledWith("openai_request_failed", {
+      id: input.id, status: 403, requestId: null, message: null, param: null, code: null,
+    });
+  });
+
+  it("ログのエラー詳細からAPIキーと画像データを除外し、長さを制限する", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: {
+      message: `test-key data:image/png;base64,secret ${"x".repeat(3_000)}`,
+      param: 123, code: null,
+    } }, { status: 400 }));
+    await expect(generateAndSaveImages(input)).rejects.toMatchObject({ code: "OPENAI_HTTP_400" });
+    const details = vi.mocked(console.error).mock.calls.find(([event]) => event === "openai_request_failed")?.[1];
+    expect(details).toMatchObject({ param: null, code: null });
+    expect(details.message).toHaveLength(2_000);
+    expect(details.message).toContain("[REDACTED] [REDACTED_IMAGE]");
+    expect(details.message).not.toContain("test-key");
+    expect(details.message).not.toContain("secret");
+  });
+
   it("妖怪画像の生成完了後、そのPNGとメダル元画像を入力としてメダルを生成する", async () => {
     const photo = Buffer.from([255, 216, 255, 224]);
     const medalPng = Buffer.concat([png, Buffer.from("medal")]);

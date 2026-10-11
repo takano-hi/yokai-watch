@@ -20,6 +20,13 @@ type OutputItem = { type: string; result?: string; content?: { text?: string }[]
 type OpenAIResponse = { output?: OutputItem[]; error?: unknown };
 type Input = { id: string; name: string; skill: string; personality: string; bytes: Buffer; mimeType: string };
 
+function sanitizeErrorDetail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const apiKey = process.env.CHATGPT_API_KEY;
+  const redacted = apiKey ? value.split(apiKey).join("[REDACTED]") : value;
+  return redacted.replace(/data:image\/[^\s"']+/g, "[REDACTED_IMAGE]").slice(0, 2_000);
+}
+
 async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, size?: string, referenceImageBase64?: string) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -36,6 +43,17 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, siz
     }),
   });
   if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const error = body && typeof body === "object" && "error" in body &&
+      body.error && typeof body.error === "object" ? body.error : null;
+    console.error("openai_request_failed", {
+      id: input.id,
+      status: response.status,
+      requestId: response.headers.get("x-request-id"),
+      message: sanitizeErrorDetail(error && "message" in error ? error.message : null),
+      param: sanitizeErrorDetail(error && "param" in error ? error.param : null),
+      code: sanitizeErrorDetail(error && "code" in error ? error.code : null),
+    });
     const status = response.status === 429 ? 429 :
       [401, 403].includes(response.status) ? 503 : response.status === 400 ? 422 : 502;
     throw new GenerationError(status, "画像生成サービスで処理できませんでした", `OPENAI_HTTP_${response.status}`);
