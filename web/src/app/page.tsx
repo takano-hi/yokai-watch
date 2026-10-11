@@ -53,7 +53,6 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
 }
 
 export default function Home() {
-  const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const [name, setName] = useState("");
@@ -98,7 +97,7 @@ export default function Home() {
       if (videoRef.current) {
         videoRef.current.srcObject = cameraStream;
         void videoRef.current.play().catch(() => {
-          setCameraError("カメラ映像を再生できません。写真を選んでください。");
+          setCameraError("カメラ映像を再生できません。カメラを再起動してください。");
           setCameraLoading(false);
         });
       }
@@ -107,11 +106,11 @@ export default function Home() {
 
       const errorName = error instanceof DOMException ? error.name : "";
       const messages: Record<string, string> = {
-        NotAllowedError: "カメラの使用が許可されていません。ブラウザーで許可するか、写真を選んでください。",
-        NotFoundError: "利用できるカメラが見つかりません。写真を選んでください。",
+        NotAllowedError: "カメラの使用が許可されていません。ブラウザーの設定でカメラを許可してください。",
+        NotFoundError: "利用できるカメラが見つかりません。",
         NotReadableError: "カメラを起動できません。他のアプリが使用中でないか確認してください。",
       };
-      setCameraError(messages[errorName] ?? "カメラを起動できません。HTTPSまたはlocalhostで開くか、写真を選んでください。");
+      setCameraError(messages[errorName] ?? "カメラを起動できません。HTTPSまたはlocalhostで開いてください。");
       setCameraLoading(false);
     });
 
@@ -168,18 +167,9 @@ export default function Home() {
     setCameraError("");
   }
 
-  function handleCapture(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    selectPhoto(file);
-    // Let the user choose the same image again after retaking or retrying.
-    event.currentTarget.value = "";
-  }
-
   function openCamera() {
     const canUseCamera = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
-    setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。写真を選んでください。");
+    setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。");
     setCameraLoading(canUseCamera);
     setCameraReady(false);
     setCameraOpen(true);
@@ -201,7 +191,7 @@ export default function Home() {
 
   function retryCamera() {
     const canUseCamera = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
-    setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。写真を選んでください。");
+    setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。");
     setCameraLoading(canUseCamera);
     setCameraReady(false);
     if (canUseCamera) setCameraAttempt((attempt) => attempt + 1);
@@ -378,23 +368,13 @@ export default function Home() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={preview ?? "/hero-sample.jpg"}
-                alt={preview ? "選択した写真のプレビュー" : "写真プレビューのサンプル"}
+                alt={preview ? "撮影した写真のプレビュー" : "写真プレビューのサンプル"}
                 className="photo-preview"
               />
-              {preview && <span className="photo-badge">写真を選択中</span>}
+              {preview && <span className="photo-badge">撮影した写真</span>}
             </>
           )}
         </div>
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="visually-hidden"
-          tabIndex={-1}
-          onChange={handleCapture}
-          aria-label="変換する写真を選ぶ"
-        />
 
         <div className="form-stack">
           <button className="camera-button" onClick={cameraOpen ? takePhoto : openCamera} disabled={cameraOpen && !cameraReady}>
@@ -404,7 +384,6 @@ export default function Home() {
           {cameraOpen && (
             <div className="camera-action-row">
               <button className="camera-secondary" type="button" onClick={switchCamera} disabled={Boolean(cameraError)}>カメラ切替</button>
-              <button className="camera-secondary" type="button" onClick={() => inputRef.current?.click()}>写真を選ぶ</button>
               {cameraError && <button className="camera-secondary" type="button" onClick={retryCamera}>再試行</button>}
             </div>
           )}
