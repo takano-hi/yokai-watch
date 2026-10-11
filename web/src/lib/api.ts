@@ -1,5 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const R2_BASE_URL = process.env.NEXT_PUBLIC_R2_BASE_URL ?? "";
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001").replace(/\/+$/, "");
+const R2_BASE_URL = (process.env.NEXT_PUBLIC_R2_BASE_URL ?? "").replace(/\/+$/, "");
 
 export type Monster = {
   id: string;
@@ -16,12 +16,22 @@ type PostMonsterResponse =
 
 export async function getMonsters(): Promise<Monster[]> {
   const res = await fetch(`${BASE_URL}/monsters`);
-  if (!res.ok) return [];
-  return res.json();
+  if (!res.ok) throw new Error("妖怪一覧を取得できませんでした");
+
+  const monsters: unknown = await res.json();
+  return Array.isArray(monsters) ? monsters as Monster[] : [];
+}
+
+export function getMonsterImageUrl(filename: string | null): string | null {
+  if (!filename) return null;
+  if (/^(?:https?:)?\/\//.test(filename) || filename.startsWith("data:")) return filename;
+
+  const key = filename.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/");
+  return R2_BASE_URL ? `${R2_BASE_URL}/${key}` : `/${key}`;
 }
 
 export function getMedalImageUrl(medalFilename: string): string {
-  return `${R2_BASE_URL}/${medalFilename}`;
+  return getMonsterImageUrl(medalFilename) ?? `/${medalFilename}`;
 }
 
 export async function postMonster(
@@ -46,9 +56,7 @@ export async function postMonster(
   return {
     success: true,
     monster,
-    imageUrl: `${R2_BASE_URL}/${monster.imageFilename}`,
-    medalUrl: monster.medalFilename
-      ? `${R2_BASE_URL}/${monster.medalFilename}`
-      : null,
+    imageUrl: getMonsterImageUrl(monster.imageFilename) ?? "",
+    medalUrl: getMonsterImageUrl(monster.medalFilename),
   };
 }

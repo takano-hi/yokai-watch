@@ -1,4 +1,4 @@
-import type { Monster } from "@/lib/api";
+import { getMonsterImageUrl, type Monster } from "@/lib/api";
 import { BrandMark } from "./brand-mark";
 
 const detailCss = `
@@ -19,6 +19,9 @@ type MonsterDetailScreenProps = {
 };
 
 export function MonsterDetailScreen({ monster, onBack }: MonsterDetailScreenProps) {
+  const portraitImage = getMonsterImageUrl(monster.imageFilename) ?? "/hero-sample.jpg";
+  const medalImage = getMonsterImageUrl(monster.medalFilename);
+
   return (
     <main className="monster-detail-view">
       <style>{detailCss}</style>
@@ -26,9 +29,19 @@ export function MonsterDetailScreen({ monster, onBack }: MonsterDetailScreenProp
       <section className="monster-detail-content" aria-labelledby="monster-detail-name">
         <h2>妖怪プロフィール</h2>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="monster-detail-portrait" src="/result-sample.png" alt={`${monster.name}の妖怪`} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="monster-detail-medal" src="/result-medal.png" alt="妖怪メダル" />
+        <img
+          className="monster-detail-portrait"
+          src={portraitImage}
+          alt={`${monster.name}の妖怪`}
+        />
+        {medalImage && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            className="monster-detail-medal"
+            src={medalImage}
+            alt={`${monster.name}の妖怪メダル`}
+          />
+        )}
         <h3 className="monster-detail-name" id="monster-detail-name">{monster.name}</h3>
         <p className="monster-detail-description">{monster.description ?? "写真からうまれた、なかま妖怪。"}</p>
         <button className="monster-detail-back" onClick={onBack}><span aria-hidden="true">‹</span> 図鑑一覧へ</button>
