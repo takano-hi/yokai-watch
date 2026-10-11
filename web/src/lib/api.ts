@@ -11,7 +11,7 @@ export type Monster = {
 };
 
 type PostMonsterResponse =
-  | { success: true; monster: Monster; imageUrl: string }
+  | { success: true; monster: Monster; imageUrl: string; medalUrl: string | null }
   | { success: false; message: string };
 
 export async function postMonster(
@@ -37,5 +37,8 @@ export async function postMonster(
     success: true,
     monster,
     imageUrl: `${R2_BASE_URL}/${monster.imageFilename}`,
+    medalUrl: monster.medalFilename
+      ? `${R2_BASE_URL}/${monster.medalFilename}`
+      : null,
   };
 }
