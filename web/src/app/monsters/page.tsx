@@ -147,7 +147,7 @@ export default function MonstersPage() {
 
         {/* ボタン: スライドコンテナの外に固定配置 */}
         <button
-          onClick={() => router.push("/")}
+          onClick={() => {router.push("/");window.location.reload()}}
           style={{
             position: "absolute",
             bottom: "24px",
