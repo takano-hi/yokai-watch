@@ -571,3 +571,70 @@ button { -webkit-tap-highlight-color: transparent; }
   border-radius: 50%;
   overflow: hidden;
 }
+
+.monster-detail-view {
+  min-height: max(100svh, 216.5vw);
+}
+
+.monster-detail-details {
+  display: flex;
+  flex-direction: column;
+  gap: 5vw;
+  padding-bottom: 8vw;
+}
+
+.monster-detail-item { margin: 0; }
+.monster-detail-item .detail-value { overflow-wrap: anywhere; }
+
+.monster-detail-value {
+  font-size: clamp(22px, 6.4vw, 72px);
+}
+
+.monster-detail-description {
+  font-size: clamp(17px, 4.7vw, 48px);
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.monster-detail-details > .directory-button {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  align-self: flex-end;
+  margin-top: 1vw;
+}
+
+.monster-detail-feedback {
+  min-height: calc(100svh - 21.2vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 36px 8vw;
+  color: white;
+  text-align: center;
+}
+
+.monster-detail-feedback p {
+  margin: 0;
+  font-family: "Youkai Display", sans-serif;
+  font-size: clamp(20px, 5vw, 32px);
+  line-height: 1.6;
+}
+
+.monster-detail-feedback .directory-button {
+  position: static;
+  min-width: 42vw;
+  min-height: 48px;
+  padding: 10px 18px;
+  font-size: clamp(18px, 4.5vw, 24px);
+}
+
+.monster-detail-feedback .loading-dot { flex: 0 0 auto; }
+
+@media (min-width: 700px) {
+  .monster-detail-view { min-height: 100svh; }
+  .monster-detail-details { gap: 24px; padding: 70px max(6vw, calc((100vw - 900px) / 2)) 56px; }
+  .monster-detail-feedback { min-height: calc(100svh - 140px); }
+}
