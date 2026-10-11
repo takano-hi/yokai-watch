@@ -127,13 +127,18 @@ describe("POST /monsters", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(await prisma.monster.count()).toBe(0);
     expect((await request(app).get(`/monsters/${res.body.id}`)).status).toBe(404);
-    expect(replies).toHaveLength(2);
+    expect(replies).toHaveLength(1);
+    replies[0](generated());
+    await vi.waitFor(() => expect(replies).toHaveLength(2));
     for (const [url, init] of vi.mocked(fetch).mock.calls) {
       expect(url).toBe("https://api.openai.com/v1/responses");
       expect(init?.headers).toEqual(expect.objectContaining({ Authorization: "Bearer existing-openai-key" }));
     }
     expect(vi.mocked(fetch).mock.calls.some(([, init]) => String(init?.body).includes("ねこパンチ"))).toBe(true);
-    replies.forEach((resolve) => resolve(generated()));
+    const bodies = vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photoBuffer.toString("base64")}`);
+    expect(bodies[1].input[0].content[0].image_url).toBe(`data:image/png;base64,${png.toString("base64")}`);
+    replies[1](generated());
     await vi.waitFor(() => expect(saves).toHaveLength(2));
     saves[0]();
     expect(await prisma.monster.count()).toBe(0);
@@ -155,6 +160,7 @@ describe("POST /monsters", () => {
     vi.mocked(fetch).mockImplementation(async () => new Response("failed", { status: 500 }));
     expect((await submit()).status).toBe(202);
     await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(uploadImage).not.toHaveBeenCalled();
     expect(await prisma.monster.count()).toBe(0);
   });

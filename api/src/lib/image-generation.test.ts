@@ -25,6 +25,35 @@ beforeEach(() => {
 });
 
 describe("generateAndSaveImages", () => {
+  it("妖怪画像の生成完了後、そのPNGだけを入力としてメダルを生成する", async () => {
+    const photo = Buffer.from([255, 216, 255, 224]);
+    const medalPng = Buffer.concat([png, Buffer.from("medal")]);
+    let resolveCharacter!: (response: Response) => void;
+    vi.mocked(fetch)
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveCharacter = resolve; }))
+      .mockResolvedValueOnce(Response.json({ output: [
+        { type: "image_generation_call", result: medalPng.toString("base64") },
+        { type: "message", content: [{ text: "メダル用テキスト" }] },
+      ] }));
+    const pending = generateAndSaveImages({ ...input, bytes: photo, mimeType: "image/jpeg" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(uploadImage).not.toHaveBeenCalled();
+    resolveCharacter(generated());
+    const result = await pending;
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const bodies = vi.mocked(fetch).mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
+    expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photo.toString("base64")}`);
+    expect(bodies[1].input[0].content).toEqual([
+      { type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` },
+      { type: "input_text", text: expect.stringContaining("同一のキャラクター") },
+    ]);
+    expect(bodies[1].tools[0]).toMatchObject({ output_format: "png", size: "1024x1024" });
+    expect(uploadImage).toHaveBeenCalledWith(`${input.id}.png`, png, "image/png", expect.any(AbortSignal));
+    expect(uploadImage).toHaveBeenCalledWith(`${input.id}-medal.png`, medalPng, "image/png", expect.any(AbortSignal));
+    expect(result.skill).toBe("とくぎ");
+  });
+
   it("両方のR2保存が完了するまで登録用の結果を返さない", async () => {
     const saves: (() => void)[] = [];
     vi.mocked(uploadImage).mockImplementation(() => new Promise<void>((resolve) => saves.push(resolve)));
@@ -60,6 +89,7 @@ describe("generateAndSaveImages", () => {
   it("キャラクター生成の拒否ではR2へ保存しない", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ output: [{ type: "message", content: [{ text: "NO_PERSON" }] }] }));
     await expect(generateAndSaveImages(input, new AbortController().signal)).rejects.toMatchObject({ status: 422 });
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(uploadImage).not.toHaveBeenCalled();
   });
 });

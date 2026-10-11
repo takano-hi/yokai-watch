@@ -11,8 +11,10 @@ const IMAGE_PROMPTS = {
         背景は透過してください。
         この子は${name}です。性格は恥ずかしがりやです。
         入力された一言：${skill}`,
-  medal: "この写真に写っている人物の特徴を活かして、妖怪ウォッチのメダル風の円形画像を生成してください。" +
-    "円形のメダルの中央に妖怪ウォッチ風にデフォルメされた人物のキャラクターイラスト、周囲に金色の装飾的なフレームデザインを描いてください。" +
+  medal: "入力画像の妖怪キャラクターを、妖怪ウォッチのメダル風の円形画像の中央に配置してください。" +
+    "顔・髪型・体型・配色・服装・足の形などのデザインを変更せず、入力画像と同一のキャラクターとして描いてください。" +
+    "別のデザインに描き直したり、新しい要素を加えたりしないでください。" +
+    "キャラクター全体がメダルの内側に収まるように配置し、周囲に金色の装飾的なフレームデザインを描いてください。" +
     "背景は必ず完全に透過（透明）にしてください。",
 };
 
@@ -69,16 +71,17 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
   let stage = "generation";
   const started = Date.now();
   try {
-    const [character, medal] = await Promise.all([
-      callOpenAI(input, IMAGE_PROMPTS.character(input.name, input.skill), generationSignal),
-      callOpenAI(input, IMAGE_PROMPTS.medal, generationSignal, "1024x1024").catch((error: unknown) => {
-        if (overallSignal.aborted) throw error;
-        console.warn("medal_generation_failed", {
-          id: input.id, code: error instanceof GenerationError ? error.code : "UPSTREAM_ERROR",
-        });
-        return null;
-      }),
-    ]);
+    const character = await callOpenAI(input, IMAGE_PROMPTS.character(input.name, input.skill), generationSignal);
+    const medal = await callOpenAI(
+      { ...input, bytes: character.bytes, mimeType: "image/png" },
+      IMAGE_PROMPTS.medal, generationSignal, "1024x1024",
+    ).catch((error: unknown) => {
+      if (overallSignal.aborted) throw error;
+      console.warn("medal_generation_failed", {
+        id: input.id, code: error instanceof GenerationError ? error.code : "UPSTREAM_ERROR",
+      });
+      return null;
+    });
     const imageFilename = `${input.id}.png`;
     const medalFilename = medal ? `${input.id}-medal.png` : null;
     stage = "storage";
