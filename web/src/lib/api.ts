@@ -14,6 +14,16 @@ type PostMonsterResponse =
   | { success: true; monster: Monster; imageUrl: string; medalUrl: string | null }
   | { success: false; message: string };
 
+export async function getMonsters(): Promise<Monster[]> {
+  const res = await fetch(`${BASE_URL}/monsters`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export function getMedalImageUrl(medalFilename: string): string {
+  return `${R2_BASE_URL}/${medalFilename}`;
+}
+
 export async function postMonster(
   name: string,
   file: File

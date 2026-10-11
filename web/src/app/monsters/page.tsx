@@ -2,9 +2,20 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { type Monster, getMonsters, getMedalImageUrl } from "@/lib/api";
 
-function MedalGrid({ justify = "start" }: { justify?: "start" | "end" }) {
+function MedalGrid({
+  justify = "start",
+  monsters,
+  offset,
+}: {
+  justify?: "start" | "end";
+  monsters: Monster[];
+  offset: number;
+}) {
+  const router = useRouter();
+
   return (
     <div
       style={{
@@ -17,16 +28,22 @@ function MedalGrid({ justify = "start" }: { justify?: "start" | "end" }) {
         alignItems: "center",
       }}
     >
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} style={{ width: "80px" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/medal.png"
-            alt=""
-            style={{ width: "100%", aspectRatio: "1" }}
-          />
-        </div>
-      ))}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const monster = monsters[offset + i];
+        const src = monster?.medalFilename
+          ? getMedalImageUrl(monster.medalFilename)
+          : "/medal.png";
+        return (
+          <div
+            key={i}
+            style={{ width: "80px", cursor: monster ? "pointer" : "default" }}
+            onClick={() => monster && router.push(`/monsters/${monster.id}`)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={monster?.name ?? ""} style={{ width: "100%", aspectRatio: "1" }} />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -34,7 +51,12 @@ function MedalGrid({ justify = "start" }: { justify?: "start" | "end" }) {
 export default function MonstersPage() {
   const router = useRouter();
   const [page, setPage] = useState<"left" | "right">("left");
+  const [monsters, setMonsters] = useState<Monster[]>([]);
   const touchStartX = useRef(0);
+
+  useEffect(() => {
+    getMonsters().then(setMonsters);
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -102,7 +124,7 @@ export default function MonstersPage() {
                 height: "360px",
               }}
             >
-              <MedalGrid />
+              <MedalGrid monsters={monsters} offset={0} />
             </div>
             {/* 右ページ: 左端は綴じ目(50%)、右に100px余白 */}
             <div
@@ -114,7 +136,7 @@ export default function MonstersPage() {
                 height: "360px",
               }}
             >
-              <MedalGrid justify="end" />
+              <MedalGrid justify="end" monsters={monsters} offset={12} />
             </div>
           </div>
         </div>
