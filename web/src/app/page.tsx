@@ -47,6 +47,7 @@ export default function Home() {
       const data = await postMonster(name.trim(), photo, personality);
       if (data.success) {
         router.push(`/monsters/${encodeURIComponent(data.monster.id)}`);
+        localStorage.setItem("book", (localStorage.getItem("book") || "") + "," + data.monster.id);
       } else {
         setErrorMessage(data.message);
         setStatus("error");
