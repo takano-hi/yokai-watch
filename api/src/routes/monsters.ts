@@ -4,7 +4,6 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { uploadImage } from "../lib/r2";
-import { loadReferenceImage } from "../lib/reference-images";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -13,29 +12,15 @@ const IMAGE_PROMPTS = {
   character: (
     name: string,
     skill: string,
-  ) => `添付した人物の写真をもとに、『妖怪ウォッチ』に登場する妖怪のような、日本の妖怪アニメ・ゲーム風のオリジナル妖怪を1体デザインし、画像を生成してください。
-
-【フォルム・絵柄】
-・ジバニャンのような、丸みのある頭と胴体、短めの手足、大きくて分かりやすい顔パーツを持つ、かわいくデフォルメされたマスコット型のフォルムを参考にする。
-・太くはっきりした輪郭線、シンプルな形、鮮やかな色、親しみやすく表情豊かなデザインにする。
-・写真の人物の髪型、目、顔の印象、服装などの特徴を、妖怪の色・模様・顔つき・装飾に反映する。
-・元の人物らしさを残しつつ、動物や不思議な生き物などの要素を組み合わせ、独自の妖怪にする。
-・毎回同じ猫型にせず、人物の特徴に合う動物型や人型、幻獣型なども取り入れながら、ジバニャンのような親しみやすいマスコット感を保つ。
-・既存キャラクターをそのままコピーせず、オリジナルのデザインにする。
-
-【画像出力】
-・背景は２枚目の画像を使ってください。これは絶対守ってください。
-・妖怪1体の全身イラスト
-・頭から足先まで画面内に収める
-・キャラクターを中央に配置する
-・入力された名前の最後ににゃんをつけて名前にしてください。
-
-【テキスト出力】
-・画像を生成した後、この妖怪の「とくぎ」を30文字以内で考えてください。
-${skill ? `・とくぎは「${skill}」をもとに、妖怪らしくアレンジしてください。\n` : ""}・テキストはとくぎだけを返してください。前置きや説明は付けないでください。
-
-説明だけで終わらせず、実際に画像を生成してください。
-この人はとてもめんどくさがり屋です。名前は${name}です`,
+  ) => `この人を妖怪ウォッチの妖怪風にしてください。
+        足はお化けみたいにしてください。
+        入力された名前をそのまま妖怪の名前にしてください。
+        入力されたこの人を表した言葉をそのまま性格にしてください。
+        入力された一言を用いてスキルを作ってください。
+        それ以外は出力しないでください。
+        背景は透過してください。
+        この子は${name}です。性格は恥ずかしがりやです。
+        入力された一言：${skill}`,
 
   medal:
     "この写真に写っている人物の特徴を活かして、妖怪ウォッチのメダル風の円形画像を生成してください。" +
@@ -60,7 +45,6 @@ async function callOpenAI(
   base64: string,
   mimeType: string,
   prompt: string,
-  referenceImageBase64: string,
   size?: string,
 ): Promise<OpenAIResponse> {
   const body = JSON.stringify({
@@ -73,10 +57,6 @@ async function callOpenAI(
             type: "input_image",
             image_url: `data:${mimeType};base64,${base64}`,
           },
-          {
-            type: "input_image",
-            image_url: `data:image/png;base64,${referenceImageBase64}`,
-          },
           { type: "input_text", text: prompt },
         ],
       },
@@ -84,6 +64,7 @@ async function callOpenAI(
     tools: [
       {
         type: "image_generation",
+        output_format: "png",
         ...(size && { size }),
       },
     ],
@@ -123,37 +104,10 @@ router.post(
 
     const base64 = req.file.buffer.toString("base64");
     const mimeType = req.file.mimetype || "image/jpeg";
-    let characterReferenceImage: string;
-    let medalReferenceImage: string;
-    try {
-      [characterReferenceImage, medalReferenceImage] = await Promise.all([
-        loadReferenceImage("character"),
-        loadReferenceImage("medal"),
-      ]);
-    } catch {
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "参照用PNGファイルを読み込めませんでした",
-        });
-      return;
-    }
 
     const [characterData, medalData] = await Promise.all([
-      callOpenAI(
-        base64,
-        mimeType,
-        IMAGE_PROMPTS.character(name, inputSkill),
-        characterReferenceImage,
-      ),
-      callOpenAI(
-        base64,
-        mimeType,
-        IMAGE_PROMPTS.medal,
-        medalReferenceImage,
-        "1024x1024",
-      ),
+      callOpenAI(base64, mimeType, IMAGE_PROMPTS.character(name, inputSkill)),
+      callOpenAI(base64, mimeType, IMAGE_PROMPTS.medal, "1024x1024"),
     ]);
 
     if (characterData.error) {

@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
     bookId: null,
     medalFilename: "mock-medal.svg",
     description: null,
+    skill: "",
+    personality: "",
   };
 
   db.set(monster.id, monster);

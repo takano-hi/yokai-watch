@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { getMonsterImageUrl, type Monster } from "@/lib/api";
 import { BrandMark } from "./brand-mark";
 
@@ -15,10 +18,10 @@ const detailCss = `
 
 type MonsterDetailScreenProps = {
   monster: Monster;
-  onBack: () => void;
 };
 
-export function MonsterDetailScreen({ monster, onBack }: MonsterDetailScreenProps) {
+export function MonsterDetailScreen({ monster }: MonsterDetailScreenProps) {
+  const router = useRouter();
   const portraitImage = getMonsterImageUrl(monster.imageFilename) ?? "/hero-sample.jpg";
   const medalImage = getMonsterImageUrl(monster.medalFilename);
 
@@ -44,7 +47,7 @@ export function MonsterDetailScreen({ monster, onBack }: MonsterDetailScreenProp
         )}
         <h3 className="monster-detail-name" id="monster-detail-name">{monster.name}</h3>
         <p className="monster-detail-description">{monster.description ?? "写真からうまれた、なかま妖怪。"}</p>
-        <button className="monster-detail-back" onClick={onBack}><span aria-hidden="true">‹</span> 図鑑一覧へ</button>
+        <button className="monster-detail-back" onClick={() => router.push("/monsters")}><span aria-hidden="true">‹</span> 図鑑一覧へ</button>
       </section>
     </main>
   );

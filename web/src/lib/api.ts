@@ -7,6 +7,8 @@ export type Monster = {
   imageFilename: string;
   bookId: string | null;
   medalFilename: string | null;
+  skill: string;
+  personality: string;
   description: string | null;
 };
 
@@ -36,11 +38,14 @@ export function getMedalImageUrl(medalFilename: string): string {
 
 export async function postMonster(
   name: string,
-  file: File
+  file: File,
+  personality: string = "",
 ): Promise<PostMonsterResponse> {
   const formData = new FormData();
   formData.append("name", name);
   formData.append("photo", file);
+  formData.append("skill", "");
+  formData.append("personality", personality);
 
   const res = await fetch(`${BASE_URL}/monsters`, {
     method: "POST",

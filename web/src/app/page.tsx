@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreateScreen } from "./_components/create-screen";
+
 import { DirectoryScreen } from "./_components/directory-screen";
 import { LoadingScreen } from "./_components/loading-screen";
 import { MonsterDetailScreen } from "./_components/monster-detail-screen";
@@ -12,15 +14,18 @@ import { getMonsters, postMonster, type Monster } from "@/lib/api";
 type ViewStatus = "welcome" | "idle" | "sending" | "done" | "error" | "directory" | "detail";
 
 export default function Home() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
   const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
+
   const [directory, setDirectory] = useState<Monster[]>([]);
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
   const [status, setStatus] = useState<ViewStatus>("welcome");
   const [errorMessage, setErrorMessage] = useState("");
+  const [personality, setPersonality] = useState("");
 
   useEffect(() => {
     if (!preview) return;
@@ -38,20 +43,7 @@ export default function Home() {
     setStatus("done");
   }, []);
 
-  useEffect(() => {
-    if (status !== "directory") return;
-    let cancelled = false;
 
-    getMonsters()
-      .then((monsters) => {
-        if (!cancelled) setDirectory(Array.isArray(monsters) ? monsters : []);
-      })
-      .catch(() => {
-        if (!cancelled) setDirectory([]);
-      });
-
-    return () => { cancelled = true; };
-  }, [status]);
 
   if (status === "welcome") {
     return <WelcomeScreen onCapture={handleCapture} />;
@@ -76,7 +68,7 @@ export default function Home() {
     setStatus("sending");
     setErrorMessage("");
     try {
-      const data = await postMonster(name.trim(), photo);
+      const data = await postMonster(name.trim(), photo, personality);
       if (data.success) {
         setGenerated(data.imageUrl);
         setGeneratedMedal(data.medalUrl);
@@ -97,29 +89,7 @@ export default function Home() {
         name={name}
         characterImage={generated}
         medalImage={generatedMedal}
-        onOpenDirectory={() => setStatus("directory")}
-      />
-    );
-  }
-
-  if (status === "directory") {
-    return (
-      <DirectoryScreen
-        monsters={directory}
-        onSelect={(monster) => {
-          setSelectedMonster(monster);
-          setStatus("detail");
-        }}
-        onBack={() => setStatus(generated ? "done" : "idle")}
-      />
-    );
-  }
-
-  if (status === "detail" && selectedMonster) {
-    return (
-      <MonsterDetailScreen
-        monster={selectedMonster}
-        onBack={() => setStatus("directory")}
+        onOpenDirectory={() => router.push("/monsters")}
       />
     );
   }
@@ -128,12 +98,14 @@ export default function Home() {
     <CreateScreen
       name={name}
       preview={preview}
-      canSubmit={Boolean(photo && name.trim())}
+      canSubmit={Boolean(photo && name.trim() && personality.trim())}
       isSending={status === "sending"}
       errorMessage={status === "error" ? errorMessage : ""}
       onCapture={handleCapture}
       onNameChange={setName}
       onSubmit={handleSubmit}
+      personality={personality}
+      onPersonalityChange={setPersonality}
     />
   );
 }
