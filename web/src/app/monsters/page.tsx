@@ -40,7 +40,11 @@ function MedalGrid({
             onClick={() => monster && router.push(`/monsters/${monster.id}`)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={monster?.name ?? ""} style={{ width: "100%", aspectRatio: "1" }} />
+            <img
+              src={src}
+              alt={monster?.name ?? ""}
+              style={{ width: "100%", aspectRatio: "1" }}
+            />
           </div>
         );
       })}
@@ -157,12 +161,10 @@ export default function MonstersPage() {
         >
           <div style={{ position: "relative" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/button.png" alt="" style={{ width: "100%", display: "block" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/button_text.png"
-              alt="トップへ"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+              src="/button.png"
+              alt=""
+              style={{ width: "100%", display: "block" }}
             />
           </div>
         </button>
