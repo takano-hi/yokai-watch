@@ -89,7 +89,7 @@ export function CreateScreen({
           return;
         }
 
-        onCapture(new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" }));
+        onCapture(new File([blob], `capture-${Date.now()}.png`, { type: "image/png" }));
         stopCamera();
       },
       "image/jpeg",
