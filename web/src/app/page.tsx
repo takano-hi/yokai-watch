@@ -236,14 +236,13 @@ export default function Home() {
                 alt={preview ? "撮影した写真のプレビュー" : "写真プレビューのサンプル"}
                 className="photo-preview"
               />
-              {preview && <span className="photo-badge">撮影した写真</span>}
             </>
           )}
         </div>
 
         <div className="form-stack">
           <button className="camera-button" onClick={cameraOpen ? takePhoto : openCamera} disabled={cameraOpen && !cameraReady}>
-            {cameraOpen ? "この枠で撮影" : photo ? "撮り直す" : "カメラで撮影"}
+            {cameraOpen ? "この枠で撮影" : "再撮影"}
           </button>
 
           {cameraOpen && (
