@@ -8,6 +8,8 @@ const SEED: Monster[] = [
     bookId: null,
     medalFilename: "mock-medal.svg",
     description: "開発用のサンプルデータです",
+    skill: "",
+    personality: "",
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440002",
@@ -16,6 +18,8 @@ const SEED: Monster[] = [
     bookId: null,
     medalFilename: "mock-medal.svg",
     description: null,
+    skill: "",
+    personality: "",
   },
 ];
 

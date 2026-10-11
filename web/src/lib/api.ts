@@ -7,6 +7,8 @@ export type Monster = {
   imageFilename: string;
   bookId: string | null;
   medalFilename: string | null;
+  skill: string;
+  personality: string;
   description: string | null;
 };
 
@@ -36,7 +38,9 @@ export function getMedalImageUrl(medalFilename: string): string {
 
 export async function postMonster(
   name: string,
-  file: File
+  file: File,
+  skill: string,
+  personality: string,
 ): Promise<PostMonsterResponse> {
   const formData = new FormData();
   formData.append("name", name);
