@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { CreateScreen } from "./_components/create-screen";
 import { DirectoryScreen } from "./_components/directory-screen";
+import { LoadingScreen } from "./_components/loading-screen";
 import { MonsterDetailScreen } from "./_components/monster-detail-screen";
 import { ResultScreen } from "./_components/result-screen";
+import { WelcomeScreen } from "./_components/welcome-screen";
 import { getMonsters, postMonster, type Monster } from "@/lib/api";
 
-type ViewStatus = "idle" | "sending" | "done" | "error" | "directory" | "detail";
+type ViewStatus = "welcome" | "idle" | "sending" | "done" | "error" | "directory" | "detail";
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -17,7 +19,7 @@ export default function Home() {
   const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
   const [directory, setDirectory] = useState<Monster[]>([]);
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
-  const [status, setStatus] = useState<ViewStatus>("idle");
+  const [status, setStatus] = useState<ViewStatus>("welcome");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -50,6 +52,14 @@ export default function Home() {
 
     return () => { cancelled = true; };
   }, [status]);
+
+  if (status === "welcome") {
+    return <WelcomeScreen onCapture={handleCapture} />;
+  }
+
+  if (status === "sending") {
+    return <LoadingScreen />;
+  }
 
   function handleCapture(file: File) {
     setPhoto(file);

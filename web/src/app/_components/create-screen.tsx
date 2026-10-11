@@ -39,12 +39,10 @@ export function CreateScreen({
         <BrandMark />
 
         <div className="photo-frame">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview ?? "/hero-sample.jpg"}
-            alt={preview ? "選択した写真のプレビュー" : "写真プレビューのサンプル"}
-            className="photo-preview"
-          />
+          {preview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="選択した写真のプレビュー" className="photo-preview" />
+          )}
           {preview && <span className="photo-badge">写真を選択中</span>}
         </div>
 

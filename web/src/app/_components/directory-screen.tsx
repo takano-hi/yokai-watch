@@ -17,7 +17,7 @@ const directoryCss = `
 .monster-card-arrow { position:absolute; right:20px; color:#77c4e4; font-size:38px; line-height:1; }
 .directory-empty { margin:0; padding:35px 20px; border-radius:24px; background:#ffffffc7; color:#268bb8; font-family:"Youkai Display",sans-serif; font-size:19px; line-height:1.8; text-align:center; }
 .directory-back { display:block; min-width:150px; margin:30px auto 0; padding:11px 24px; border:1px solid #fffc; border-radius:999px; background:#ffffff47; color:white; font-family:"Youkai Display",sans-serif; font-size:20px; cursor:pointer; }
-.directory-back span { margin-right:5px; font-family:Arial,sans-serif; }
+.directory-back span { margin-right:5px; }
 @media(min-width:700px) { .monster-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .directory-banner { height:140px; } }
 `;
 
