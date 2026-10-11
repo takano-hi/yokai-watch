@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreateScreen } from "./_components/create-screen";
-import { DirectoryScreen } from "./_components/directory-screen";
-import { MonsterDetailScreen } from "./_components/monster-detail-screen";
 import { ResultScreen } from "./_components/result-screen";
-import { getMonsters, postMonster, type Monster } from "@/lib/api";
+import { postMonster } from "@/lib/api";
 
-type ViewStatus = "idle" | "sending" | "done" | "error" | "directory" | "detail";
+type ViewStatus = "idle" | "sending" | "done" | "error";
 
 export default function Home() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
   const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
-  const [directory, setDirectory] = useState<Monster[]>([]);
-  const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
   const [status, setStatus] = useState<ViewStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -35,21 +33,6 @@ export default function Home() {
     setGeneratedMedal("/result-medal.png");
     setStatus("done");
   }, []);
-
-  useEffect(() => {
-    if (status !== "directory") return;
-    let cancelled = false;
-
-    getMonsters()
-      .then((monsters) => {
-        if (!cancelled) setDirectory(Array.isArray(monsters) ? monsters : []);
-      })
-      .catch(() => {
-        if (!cancelled) setDirectory([]);
-      });
-
-    return () => { cancelled = true; };
-  }, [status]);
 
   function handleCapture(file: File) {
     setPhoto(file);
@@ -87,29 +70,7 @@ export default function Home() {
         name={name}
         characterImage={generated}
         medalImage={generatedMedal}
-        onOpenDirectory={() => setStatus("directory")}
-      />
-    );
-  }
-
-  if (status === "directory") {
-    return (
-      <DirectoryScreen
-        monsters={directory}
-        onSelect={(monster) => {
-          setSelectedMonster(monster);
-          setStatus("detail");
-        }}
-        onBack={() => setStatus(generated ? "done" : "idle")}
-      />
-    );
-  }
-
-  if (status === "detail" && selectedMonster) {
-    return (
-      <MonsterDetailScreen
-        monster={selectedMonster}
-        onBack={() => setStatus("directory")}
+        onOpenDirectory={() => router.push("/monsters")}
       />
     );
   }
