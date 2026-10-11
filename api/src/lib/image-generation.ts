@@ -39,7 +39,7 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, siz
         ...(referenceImageBase64 ? [{ type: "input_image", image_url: `data:image/png;base64,${referenceImageBase64}` }] : []),
         { type: "input_text", text: prompt },
       ] }],
-      tools: [{ type: "image_generation", background: "transparent", output_format: "png", ...(size && { size }) }],
+      tools: [{ type: "image_generation", model: "gpt-image-2.5-sunburst", background: "transparent", output_format: "png", ...(size && { size }) }],
     }),
   });
   if (!response.ok) {
