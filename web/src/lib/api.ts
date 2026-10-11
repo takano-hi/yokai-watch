@@ -39,12 +39,13 @@ export function getMedalImageUrl(medalFilename: string): string {
 export async function postMonster(
   name: string,
   file: File,
-  skill: string,
-  personality: string,
+  personality: string = "",
 ): Promise<PostMonsterResponse> {
   const formData = new FormData();
   formData.append("name", name);
   formData.append("photo", file);
+  formData.append("skill", "");
+  formData.append("personality", personality);
 
   const res = await fetch(`${BASE_URL}/monsters`, {
     method: "POST",

@@ -50,7 +50,7 @@ export default function Home() {
     setStatus("sending");
     setErrorMessage("");
     try {
-      const data = await postMonster(name.trim(), photo);
+      const data = await postMonster(name.trim(), photo, personality);
       if (data.success) {
         setGenerated(data.imageUrl);
         setGeneratedMedal(data.medalUrl);
