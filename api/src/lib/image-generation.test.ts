@@ -50,13 +50,14 @@ describe("generateAndSaveImages", () => {
     const bodies = vi.mocked(fetch).mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
     expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photo.toString("base64")}`);
     expect(bodies[0].input[0].content).toHaveLength(2);
+    expect(bodies[0].tools[0]).toMatchObject({ type: "image_generation", background: "transparent", output_format: "png" });
     expect(loadReferenceImage).toHaveBeenCalledExactlyOnceWith("medal");
     expect(bodies[1].input[0].content).toEqual([
       { type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` },
       { type: "input_image", image_url: `data:image/png;base64,${templatePng.toString("base64")}` },
       { type: "input_text", text: expect.stringContaining("同一のキャラクター") },
     ]);
-    expect(bodies[1].tools[0]).toMatchObject({ output_format: "png", size: "1024x1024" });
+    expect(bodies[1].tools[0]).toMatchObject({ type: "image_generation", background: "transparent", output_format: "png", size: "1024x1024" });
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}.png`, png, "image/png", expect.any(AbortSignal));
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}-medal.png`, medalPng, "image/png", expect.any(AbortSignal));
     expect(result.skill).toBe("とくぎ");
