@@ -192,20 +192,48 @@ export default function Home() {
     setCameraError("");
   }
 
+  function switchCamera() {
+    setCameraFacingMode((mode) => mode === "environment" ? "user" : "environment");
+    setCameraLoading(true);
+    setCameraReady(false);
+    setCameraError("");
+  }
+
+  function retryCamera() {
+    const canUseCamera = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
+    setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。写真を選んでください。");
+    setCameraLoading(canUseCamera);
+    setCameraReady(false);
+    if (canUseCamera) setCameraAttempt((attempt) => attempt + 1);
+  }
+
   function takePhoto() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return;
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const cropSize = Math.min(video.videoWidth, video.videoHeight);
+    const sourceX = (video.videoWidth - cropSize) / 2;
+    const sourceY = (video.videoHeight - cropSize) / 2;
+    canvas.width = cropSize;
+    canvas.height = cropSize;
     const context = canvas.getContext("2d");
     if (!context) {
       setCameraError("写真を撮影できませんでした。もう一度お試しください。");
       return;
     }
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      video,
+      sourceX,
+      sourceY,
+      cropSize,
+      cropSize,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
     canvas.toBlob((blob) => {
       if (!blob) {
         setCameraError("写真を保存できませんでした。もう一度お試しください。");
@@ -331,13 +359,31 @@ export default function Home() {
         <BrandMark />
 
         <div className="photo-frame">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview ?? "/hero-sample.jpg"}
-            alt={preview ? "選択した写真のプレビュー" : "写真プレビューのサンプル"}
-            className="photo-preview"
-          />
-          {preview && <span className="photo-badge">写真を選択中</span>}
+          {cameraOpen ? (
+            <div className="camera-viewfinder" role="group" aria-label="写真撮影用カメラ">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                onCanPlay={() => { setCameraReady(true); setCameraLoading(false); }}
+                aria-label="カメラのライブ映像"
+              />
+              {cameraLoading && <p className="camera-loading" role="status">カメラを起動しています…</p>}
+              {cameraError && <p className="camera-error" role="alert">{cameraError}</p>}
+              <button className="camera-inline-close" type="button" onClick={closeCamera} aria-label="カメラを閉じる">×</button>
+            </div>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview ?? "/hero-sample.jpg"}
+                alt={preview ? "選択した写真のプレビュー" : "写真プレビューのサンプル"}
+                className="photo-preview"
+              />
+              {preview && <span className="photo-badge">写真を選択中</span>}
+            </>
+          )}
         </div>
 
         <input
@@ -351,9 +397,17 @@ export default function Home() {
         />
 
         <div className="form-stack">
-          <button className="camera-button" onClick={openCamera}>
-            {photo ? "撮り直す" : "カメラで撮影"}
+          <button className="camera-button" onClick={cameraOpen ? takePhoto : openCamera} disabled={cameraOpen && !cameraReady}>
+            {cameraOpen ? "この枠で撮影" : photo ? "撮り直す" : "カメラで撮影"}
           </button>
+
+          {cameraOpen && (
+            <div className="camera-action-row">
+              <button className="camera-secondary" type="button" onClick={switchCamera} disabled={Boolean(cameraError)}>カメラ切替</button>
+              <button className="camera-secondary" type="button" onClick={() => inputRef.current?.click()}>写真を選ぶ</button>
+              {cameraError && <button className="camera-secondary" type="button" onClick={retryCamera}>再試行</button>}
+            </div>
+          )}
 
           <label className="name-field">
             <span className="visually-hidden">妖怪の名前</span>
@@ -383,60 +437,6 @@ export default function Home() {
 
       </section>
 
-      {cameraOpen && (
-        <div className="camera-overlay">
-          <section className="camera-dialog" role="dialog" aria-modal="true" aria-labelledby="camera-title">
-            <div className="camera-dialog-heading">
-              <h2 id="camera-title">写真を撮影</h2>
-              <button className="camera-close" type="button" onClick={closeCamera} aria-label="カメラを閉じる">×</button>
-            </div>
-            <div className="camera-viewfinder">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                onCanPlay={() => { setCameraReady(true); setCameraLoading(false); }}
-                aria-label="カメラのライブ映像"
-              />
-              {cameraLoading && <p className="camera-loading" role="status">カメラを起動しています…</p>}
-              {cameraError && <p className="camera-error" role="alert">{cameraError}</p>}
-            </div>
-            <div className="camera-controls">
-              <button
-                className="camera-secondary"
-                type="button"
-                onClick={() => {
-                  setCameraFacingMode((mode) => mode === "environment" ? "user" : "environment");
-                  setCameraLoading(true);
-                  setCameraReady(false);
-                  setCameraError("");
-                }}
-                disabled={Boolean(cameraError)}
-              >
-                カメラ切替
-              </button>
-              <button className="camera-capture" type="button" onClick={takePhoto} disabled={!cameraReady}>
-                撮影する
-              </button>
-              <button className="camera-secondary" type="button" onClick={() => inputRef.current?.click()}>
-                写真を選ぶ
-              </button>
-            </div>
-            {cameraError && (
-              <button className="camera-retry" type="button" onClick={() => {
-                const canUseCamera = Boolean(navigator.mediaDevices?.getUserMedia);
-                setCameraError(canUseCamera ? "" : "このブラウザーではカメラを使えません。写真を選んでください。");
-                setCameraLoading(canUseCamera);
-                setCameraReady(false);
-                if (canUseCamera) setCameraAttempt((attempt) => attempt + 1);
-              }}>
-                カメラを再試行
-              </button>
-            )}
-          </section>
-        </div>
-      )}
     </main>
   );
 }
