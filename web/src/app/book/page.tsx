@@ -10,7 +10,7 @@ async function getMonsters(): Promise<Monster[]> {
 
   const monsters = localStorage.getItem("book")?.split(",") || [];
   const ret: Monster[] = []
-  for (let i = 0; i < monsters.length; i++) {
+  for (let i = 1; i < monsters.length; i++) {
     const monsterId = monsters[i];
     const monster = await getMonster(monsterId)
     if (monster) ret.push(monster)
