@@ -2,6 +2,23 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## 環境変数
 
+画像生成APIのデプロイでは、VercelのRoot Directoryを`web`、Fluid computeを有効に設定します。`POST /api/generations`は、OpenAIで画像を生成してR2へ保存してからHTTP 200を返す同期APIです。DB登録はHerokuが行います。
+
+Vercelには`IMAGE_GENERATION_API_TOKEN`、`CHATGPT_API_KEY`と、`.env-sample`にある`CLOUDFLARE_R2_*`の4項目を設定してください。`OPENAI_IMAGE_MODEL`の初期値は`gpt-6-luna`です。これらの認証情報はサーバー専用です。
+
+API・入力制限・curl例は[仕様書](../docs/image-generation-deferred-registration.md)に記載しています。生成APIを直接curlするとR2に保存されますが、DB登録は行われません。
+
+Webの依存にR2 SDKとテスト用Vitestを追加しています。既存Docker環境ではWebイメージの再ビルドが必要です。
+
+```bash
+docker compose build web
+docker compose up -d web
+docker compose exec -T web npm test
+docker compose exec -T web npx tsc --noEmit
+docker compose exec -T web npm run lint
+docker compose exec -T web npm run build
+```
+
 `.env-sample` をコピーして `.env` を作成し、各キーに値を設定してください。
 
 ```bash

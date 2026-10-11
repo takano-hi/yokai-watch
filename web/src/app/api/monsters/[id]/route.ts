@@ -9,10 +9,10 @@ export async function GET(_req: NextRequest, { params }: { params: Params }) {
   if (!monster) {
     return NextResponse.json(
       { success: false, message: "妖怪が見つかりません" },
-      { status: 404 }
+      { status: 404, headers: { "Cache-Control": "no-store" } }
     );
   }
-  return NextResponse.json(monster);
+  return NextResponse.json(monster, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Params }) {

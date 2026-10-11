@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateScreen } from "./_components/create-screen";
 import { ResultScreen } from "./_components/result-screen";
@@ -17,6 +17,9 @@ export default function Home() {
   const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
   const [status, setStatus] = useState<ViewStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const submission = useRef<AbortController | null>(null);
+
+  useEffect(() => () => submission.current?.abort(), []);
 
   useEffect(() => {
     if (!preview) return;
@@ -44,12 +47,15 @@ export default function Home() {
   }
 
   async function handleSubmit() {
-    if (!photo || !name.trim()) return;
+    if (!photo || !name.trim() || submission.current) return;
 
+    const controller = new AbortController();
+    submission.current = controller;
     setStatus("sending");
     setErrorMessage("");
     try {
-      const data = await postMonster(name.trim(), photo);
+      const data = await postMonster(name.trim(), photo, "", "", controller.signal);
+      if (controller.signal.aborted) return;
       if (data.success) {
         setGenerated(data.imageUrl);
         setGeneratedMedal(data.medalUrl);
@@ -59,8 +65,11 @@ export default function Home() {
         setStatus("error");
       }
     } catch {
+      if (controller.signal.aborted) return;
       setErrorMessage("送信に失敗しました。通信環境を確認して、もう一度お試しください。");
       setStatus("error");
+    } finally {
+      submission.current = null;
     }
   }
 
