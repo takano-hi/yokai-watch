@@ -17,8 +17,11 @@ const mockOpenAI = (body: object, status = 200) => {
   );
 };
 
-const imageGenerationResponse = (base64 = "abc123") => ({
-  output: [{ type: "image_generation_call", result: base64 }],
+const imageGenerationResponse = (base64 = "abc123", text?: string) => ({
+  output: [
+    { type: "image_generation_call", result: base64 },
+    ...(text !== undefined ? [{ type: "message", content: [{ type: "output_text", text }] }] : []),
+  ],
 });
 
 describe("GET /monsters", () => {
@@ -39,14 +42,16 @@ describe("GET /monsters", () => {
             name: "ジバニャン",
             imageFilename: "jibanyan.png",
             medalFilename: "jibanyan_medal.png",
-            description: "赤と黒のしましま模様の猫の妖怪",
+            skill: "ひゃくれつ肉球",
+            personality: "めんどくさがり",
           },
           {
             bookId: book.id,
             name: "ウィスパー",
             imageFilename: "whisper.png",
             medalFilename: "whisper_medal.png",
-            description: "白くてふわふわした妖怪執事",
+            skill: "妖怪の案内",
+            personality: "おしゃべり",
           },
         ],
       });
@@ -70,7 +75,9 @@ describe("GET /monsters", () => {
       expect(monster).toHaveProperty("name");
       expect(monster).toHaveProperty("imageFilename");
       expect(monster).toHaveProperty("medalFilename");
-      expect(monster).toHaveProperty("description");
+      expect(monster).toHaveProperty("skill");
+      expect(monster).toHaveProperty("personality");
+      expect(monster).not.toHaveProperty("description");
     });
   });
 });
@@ -147,6 +154,51 @@ describe("POST /monsters", () => {
     const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
     expect(saved?.name).toBe("ジバニャン");
     expect(saved?.imageFilename).toBe(res.body.imageFilename);
+  });
+
+  it("入力された skill を ChatGPT に渡し、生成されたとくぎを保存する", async () => {
+    mockOpenAI(imageGenerationResponse("abc123", "ひゃくれつ肉球パンチ\n"));
+
+    const res = await request(app)
+      .post("/monsters")
+      .field("name", "ジバニャン")
+      .field("skill", "ねこパンチ")
+      .attach("photo", photoBuffer, "photo.jpg");
+
+    expect(res.status).toBe(201);
+    expect(res.body.skill).toBe("ひゃくれつ肉球パンチ");
+    const prompts = vi.mocked(fetch).mock.calls.map(([, init]) => String(init?.body));
+    expect(prompts.some((body) => body.includes("ねこパンチ"))).toBe(true);
+    const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
+    expect(saved?.skill).toBe("ひゃくれつ肉球パンチ");
+  });
+
+  it("入力された personality をそのまま保存する", async () => {
+    mockOpenAI(imageGenerationResponse("abc123", "ひゃくれつ肉球"));
+
+    const res = await request(app)
+      .post("/monsters")
+      .field("name", "ジバニャン")
+      .field("personality", "めんどくさがり")
+      .attach("photo", photoBuffer, "photo.jpg");
+
+    expect(res.status).toBe(201);
+    expect(res.body.personality).toBe("めんどくさがり");
+    const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
+    expect(saved?.personality).toBe("めんどくさがり");
+  });
+
+  it("テキストも personality もないとき skill と personality は空文字で保存する", async () => {
+    mockOpenAI(imageGenerationResponse());
+
+    const res = await request(app)
+      .post("/monsters")
+      .field("name", "ジバニャン")
+      .attach("photo", photoBuffer, "photo.jpg");
+
+    expect(res.status).toBe(201);
+    expect(res.body.skill).toBe("");
+    expect(res.body.personality).toBe("");
   });
 });
 

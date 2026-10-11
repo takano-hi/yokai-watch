@@ -61,6 +61,14 @@
                     "type": "string",
                     "format": "binary",
                     "description": "元となる人物写真"
+                  },
+                  "skill": {
+                    "type": "string",
+                    "description": "とくぎの元になる文言（任意）。ChatGPT に渡してとくぎを生成させる"
+                  },
+                  "personality": {
+                    "type": "string",
+                    "description": "せいかく（任意）。そのまま保存される"
                   }
                 }
               }
@@ -191,14 +199,15 @@
     "schemas": {
       "Monster": {
         "type": "object",
-        "required": ["id", "name", "imageFilename"],
+        "required": ["id", "name", "imageFilename", "skill", "personality"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "name": { "type": "string" },
           "imageFilename": { "type": "string", "example": "550e8400-e29b-41d4-a716-446655440000.png" },
           "medalFilename": { "type": "string", "nullable": true },
           "bookId": { "type": "string", "format": "uuid", "nullable": true },
-          "description": { "type": "string", "nullable": true }
+          "skill": { "type": "string", "default": "" },
+          "personality": { "type": "string", "default": "" }
         }
       },
       "ErrorResponse": {

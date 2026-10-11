@@ -10,7 +10,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const IMAGE_PROMPTS = {
-  character: (name: string) => `添付した人物の写真をもとに、『妖怪ウォッチ』に登場する妖怪のような、日本の妖怪アニメ・ゲーム風のオリジナル妖怪を1体デザインし、画像を生成してください。
+  character: (name: string, skill: string) => `添付した人物の写真をもとに、『妖怪ウォッチ』に登場する妖怪のような、日本の妖怪アニメ・ゲーム風のオリジナル妖怪を1体デザインし、画像を生成してください。
 
 【フォルム・絵柄】
 ・ジバニャンのような、丸みのある頭と胴体、短めの手足、大きくて分かりやすい顔パーツを持つ、かわいくデフォルメされたマスコット型のフォルムを参考にする。
@@ -25,8 +25,11 @@ const IMAGE_PROMPTS = {
 ・妖怪1体の全身イラスト
 ・頭から足先まで画面内に収める
 ・キャラクターを中央に配置する
-・その人の説明文を書いてください。
 ・入力された名前の最後ににゃんをつけて名前にしてください。
+
+【テキスト出力】
+・画像を生成した後、この妖怪の「とくぎ」を30文字以内で考えてください。
+${skill ? `・とくぎは「${skill}」をもとに、妖怪らしくアレンジしてください。\n` : ""}・テキストはとくぎだけを返してください。前置きや説明は付けないでください。
 
 説明だけで終わらせず、実際に画像を生成してください。
 この人はとてもめんどくさがり屋です。名前は${name}です`,
@@ -40,6 +43,10 @@ const IMAGE_PROMPTS = {
 
 type OutputItem = { type: string; result?: string; content?: { text?: string }[] };
 type OpenAIResponse = { error?: { message: string }; output?: OutputItem[] };
+
+function extractMessageText(data: OpenAIResponse): string {
+  return data.output?.find((o) => o.type === "message")?.content?.[0]?.text ?? "";
+}
 
 async function callOpenAI(
   base64: string,
@@ -75,6 +82,9 @@ async function callOpenAI(
 
 router.post("/", upload.single("photo"), async (req: Request, res: Response) => {
   const name = req.body.name as string | undefined;
+  // skill は ChatGPT に渡して生成させ、personality は入力値をそのまま保存する
+  const inputSkill = (req.body.skill as string | undefined)?.trim() ?? "";
+  const personality = (req.body.personality as string | undefined)?.trim() ?? "";
   if (!name) {
     res.status(400).json({ success: false, message: "name フィールドが見つかりません" });
     return;
@@ -99,7 +109,7 @@ router.post("/", upload.single("photo"), async (req: Request, res: Response) => 
   }
 
   const [characterData, medalData] = await Promise.all([
-    callOpenAI(base64, mimeType, IMAGE_PROMPTS.character(name), characterReferenceImage),
+    callOpenAI(base64, mimeType, IMAGE_PROMPTS.character(name, inputSkill), characterReferenceImage),
     callOpenAI(base64, mimeType, IMAGE_PROMPTS.medal, medalReferenceImage, "256x256"),
   ]);
 
@@ -110,9 +120,10 @@ router.post("/", upload.single("photo"), async (req: Request, res: Response) => 
 
   const characterOutput = characterData.output?.find((o) => o.type === "image_generation_call");
 
+  const characterText = extractMessageText(characterData);
+
   if (!characterOutput?.result) {
-    const text = characterData.output?.find((o) => o.type === "message")?.content?.[0]?.text ?? "";
-    if (text.trim() === "NO_PERSON") {
+    if (characterText.trim() === "NO_PERSON") {
       res.status(422).json({ success: false, message: "人物を特定できませんでした" });
     } else {
       res.status(422).json({ success: false, message: "画像の生成に失敗しました" });
@@ -120,6 +131,7 @@ router.post("/", upload.single("photo"), async (req: Request, res: Response) => 
     return;
   }
 
+  const skill = characterText.trim();
   const medalOutput = medalData.output?.find((o) => o.type === "image_generation_call");
 
   const imageFilename = `${randomUUID()}.png`;
@@ -133,7 +145,7 @@ router.post("/", upload.single("photo"), async (req: Request, res: Response) => 
   ]);
 
   const monster = await prisma.monster.create({
-    data: { name, imageFilename, medalFilename },
+    data: { name, imageFilename, medalFilename, skill, personality },
   });
 
   res.status(201).json(monster);
