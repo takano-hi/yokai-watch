@@ -2,6 +2,9 @@ import request from "supertest";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import app from "../app";
 import prisma from "../lib/prisma";
+import { getR2Config, uploadImage } from "../lib/r2";
+
+vi.mock("../lib/r2", () => ({ getR2Config: vi.fn(), uploadImage: vi.fn() }));
 
 describe("GET /monsters", () => {
   it("データがないとき空配列を返す", async () => {
@@ -63,62 +66,59 @@ describe("GET /monsters", () => {
 
 describe("POST /monsters", () => {
   const photoBuffer = Buffer.from([255, 216, 255, 224, 0, 0]);
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   const submit = () => request(app).post("/monsters")
     .field("name", "ジバニャン").attach("photo", photoBuffer, "photo.jpg");
-  const result = (id: string) => ({
-    id, imageFilename: `${id}.png`, medalFilename: `${id}-medal.png`, skill: "ひゃくれつ肉球",
-  });
+  const generated = () => Response.json({ output: [
+    { type: "image_generation_call", result: png.toString("base64") },
+    { type: "message", content: [{ text: "ひゃくれつ肉球\n" }] },
+  ] });
 
   beforeEach(() => {
-    vi.stubEnv("IMAGE_GENERATION_API_URL", "https://generation.example/api/generations");
-    vi.stubEnv("IMAGE_GENERATION_API_TOKEN", "test-token");
+    vi.clearAllMocks();
+    vi.stubEnv("CHATGPT_API_KEY", "existing-openai-key");
+    vi.stubEnv("IMAGE_GENERATION_API_URL", "");
+    vi.stubEnv("IMAGE_GENERATION_API_TOKEN", "");
+    vi.mocked(getR2Config).mockReset();
+    vi.mocked(uploadImage).mockReset().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => generated()));
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
+    vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks();
   });
 
   it("nameがなければ400", async () => {
-    const res = await request(app).post("/monsters").attach("photo", photoBuffer, "photo.jpg");
-    expect(res.status).toBe(400);
+    expect((await request(app).post("/monsters").attach("photo", photoBuffer, "photo.jpg")).status).toBe(400);
   });
-
   it("photoがなければ400", async () => {
-    const res = await request(app).post("/monsters").field("name", "ジバニャン");
-    expect(res.status).toBe(400);
+    expect((await request(app).post("/monsters").field("name", "ジバニャン")).status).toBe(400);
   });
-
   it("空白の名前は400", async () => {
-    const res = await request(app).post("/monsters").field("name", "   ")
-      .attach("photo", photoBuffer, "photo.jpg");
-    expect(res.status).toBe(400);
+    expect((await request(app).post("/monsters").field("name", "   ").attach("photo", photoBuffer, "photo.jpg")).status).toBe(400);
   });
-
   it("写真の実形式が不正なら415", async () => {
-    const res = await request(app).post("/monsters").field("name", "demo")
-      .attach("photo", Buffer.from("not a jpeg"), "photo.jpg");
-    expect(res.status).toBe(415);
+    expect((await request(app).post("/monsters").field("name", "demo").attach("photo", Buffer.from("not a jpeg"), "photo.jpg")).status).toBe(415);
   });
-
   it("4MBを超える写真は413", async () => {
-    const res = await request(app).post("/monsters").field("name", "demo")
-      .attach("photo", Buffer.alloc(4_000_001), "photo.jpg");
-    expect(res.status).toBe(413);
+    expect((await request(app).post("/monsters").field("name", "demo").attach("photo", Buffer.alloc(4_000_001), "photo.jpg")).status).toBe(413);
   });
-
-  it("生成API未設定なら受付前に503", async () => {
-    vi.stubEnv("IMAGE_GENERATION_API_TOKEN", "");
-    const res = await submit();
-    expect(res.status).toBe(503);
+  it("既存OpenAIキー未設定なら受付前に503", async () => {
+    vi.stubEnv("CHATGPT_API_KEY", "");
+    expect((await submit()).status).toBe(503);
     expect(await prisma.monster.count()).toBe(0);
   });
+  it("既存R2設定が不備なら受付前に503", async () => {
+    vi.mocked(getR2Config).mockImplementation(() => { throw new Error("not configured"); });
+    expect((await submit()).status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
-  it("生成APIが応答する前に202を返し、R2保存完了の結果を待って発行済みIDで登録する", async () => {
-    let complete!: (response: Response) => void;
-    const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { complete = resolve; }));
-    vi.stubGlobal("fetch", fetchMock);
+  it("追加接続設定なしで202を先に返し、すべてのR2保存後に発行済みIDで登録する", async () => {
+    const replies: ((response: Response) => void)[] = [];
+    const saves: (() => void)[] = [];
+    vi.mocked(fetch).mockImplementation(() => new Promise<Response>((resolve) => replies.push(resolve)));
+    vi.mocked(uploadImage).mockImplementation(() => new Promise<void>((resolve) => saves.push(resolve)));
     const res = await request(app).post("/monsters").field("name", " ジバニャン ")
       .field("skill", "ねこパンチ").field("personality", "めんどくさがり")
       .attach("photo", photoBuffer, "photo.jpg");
@@ -127,13 +127,17 @@ describe("POST /monsters", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(await prisma.monster.count()).toBe(0);
     expect((await request(app).get(`/monsters/${res.body.id}`)).status).toBe(404);
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
-    const form = init.body as FormData;
-    expect(form.get("id")).toBe(res.body.id);
-    expect(form.get("skill")).toBe("ねこパンチ");
-    expect(form.get("personality")).toBe("めんどくさがり");
-    expect(init.headers).toEqual({ Authorization: "Bearer test-token" });
-    complete(Response.json(result(res.body.id)));
+    expect(replies).toHaveLength(2);
+    for (const [url, init] of vi.mocked(fetch).mock.calls) {
+      expect(url).toBe("https://api.openai.com/v1/responses");
+      expect(init?.headers).toEqual(expect.objectContaining({ Authorization: "Bearer existing-openai-key" }));
+    }
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => String(init?.body).includes("ねこパンチ"))).toBe(true);
+    replies.forEach((resolve) => resolve(generated()));
+    await vi.waitFor(() => expect(saves).toHaveLength(2));
+    saves[0]();
+    expect(await prisma.monster.count()).toBe(0);
+    saves[1]();
     await vi.waitFor(async () => {
       const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
       expect(saved?.name).toBe("ジバニャン");
@@ -146,60 +150,46 @@ describe("POST /monsters", () => {
     expect(registered.headers["cache-control"]).toBe("no-store");
   });
 
-  it.each([502, 504])("生成・R2保存が失敗した場合（%s）も202で受付後、DB登録せずログに残す", async (status) => {
+  it("OpenAI生成失敗後はDB登録しない", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("upstream failed", { status })));
-    const res = await submit();
-    expect(res.status).toBe(202);
+    vi.mocked(fetch).mockImplementation(async () => new Response("failed", { status: 500 }));
+    expect((await submit()).status).toBe(202);
     await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(uploadImage).not.toHaveBeenCalled();
     expect(await prisma.monster.count()).toBe(0);
   });
-
-  it("不正なIDの生成結果は登録しない", async () => {
+  it("R2保存失敗後はDB登録しない", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(result("wrong-id"))));
-    const res = await submit();
-    expect(res.status).toBe(202);
-    await vi.waitFor(() => expect(log).toHaveBeenCalled());
-    expect(await prisma.monster.count()).toBe(0);
-  });
-
-  it("メダルなしの成功結果も同じIDで登録する", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      const id = (init.body as FormData).get("id") as string;
-      return Response.json({ ...result(id), medalFilename: null });
-    }));
-    const res = await submit();
-    expect(res.status).toBe(202);
-    await vi.waitFor(async () => {
-      const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
-      expect(saved).not.toBeNull();
-      expect(saved?.medalFilename).toBeNull();
-    });
-  });
-
-  it("生成APIが200で非JSONを返してもDB登録しない", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json")));
+    vi.mocked(uploadImage).mockRejectedValue(new Error("storage failed"));
     expect((await submit()).status).toBe(202);
     await vi.waitFor(() => expect(log).toHaveBeenCalled());
     expect(await prisma.monster.count()).toBe(0);
   });
-
+  it("メダル生成のみの失敗はnullで登録する", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(generated()).mockResolvedValueOnce(new Response("failed", { status: 500 }));
+    const res = await submit();
+    expect(res.status).toBe(202);
+    await vi.waitFor(async () => {
+      const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
+      expect(saved).not.toBeNull(); expect(saved?.medalFilename).toBeNull();
+    });
+  });
+  it("OpenAIが非JSONを返したらDB登録しない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockImplementation(async () => new Response("not json"));
+    expect((await submit()).status).toBe(202);
+    await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(await prisma.monster.count()).toBe(0);
+  });
   it("応答後のDB登録失敗を捕捉する", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const originalCreate = prisma.monster.create;
     prisma.monster.create = vi.fn().mockRejectedValueOnce(new Error("DB unavailable"));
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-      return Response.json(result((init.body as FormData).get("id") as string));
-    }));
     try {
       expect((await submit()).status).toBe(202);
       await vi.waitFor(() => expect(log).toHaveBeenCalledWith("monster_processing_failed", expect.objectContaining({ stage: "registration" })));
       expect(await prisma.monster.count()).toBe(0);
-    } finally {
-      prisma.monster.create = originalCreate;
-    }
+    } finally { prisma.monster.create = originalCreate; }
   });
 });
 describe("GET /monsters/:id", () => {

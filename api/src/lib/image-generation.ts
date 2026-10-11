@@ -1,4 +1,4 @@
-import { GenerationError, parseGenerationInput } from "./generation-input";
+import { GenerationError } from "./generation-input";
 import { getR2Config, uploadImage } from "./r2";
 
 const IMAGE_PROMPTS = {
@@ -18,7 +18,7 @@ const IMAGE_PROMPTS = {
 
 type OutputItem = { type: string; result?: string; content?: { text?: string }[] };
 type OpenAIResponse = { output?: OutputItem[]; error?: unknown };
-type Input = Awaited<ReturnType<typeof parseGenerationInput>>;
+type Input = { id: string; name: string; skill: string; personality: string; bytes: Buffer; mimeType: string };
 
 async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, size?: string) {
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -26,7 +26,7 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, siz
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CHATGPT_API_KEY}` },
     signal,
     body: JSON.stringify({
-      model: process.env.OPENAI_IMAGE_MODEL || "gpt-6-luna",
+      model: "gpt-6-luna",
       input: [{ role: "user", content: [
         { type: "input_image", image_url: `data:${input.mimeType};base64,${input.bytes.toString("base64")}` },
         { type: "input_text", text: prompt },
@@ -55,11 +55,15 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, siz
   return { bytes, text };
 }
 
-export async function generateAndSaveImages(input: Input, requestSignal: AbortSignal) {
+export function getGenerationConfig() {
   if (!process.env.CHATGPT_API_KEY) {
     throw new GenerationError(503, "画像生成サービスが設定されていません", "OPENAI_NOT_CONFIGURED");
   }
   getR2Config();
+}
+
+export async function generateAndSaveImages(input: Input, requestSignal = new AbortController().signal) {
+  getGenerationConfig();
   const overallSignal = AbortSignal.any([requestSignal, AbortSignal.timeout(270_000)]);
   const generationSignal = AbortSignal.any([overallSignal, AbortSignal.timeout(240_000)]);
   let stage = "generation";
@@ -79,8 +83,8 @@ export async function generateAndSaveImages(input: Input, requestSignal: AbortSi
     const medalFilename = medal ? `${input.id}-medal.png` : null;
     stage = "storage";
     await Promise.all([
-      uploadImage(imageFilename, character.bytes, overallSignal),
-      ...(medal && medalFilename ? [uploadImage(medalFilename, medal.bytes, overallSignal)] : []),
+      uploadImage(imageFilename, character.bytes, "image/png", overallSignal),
+      ...(medal && medalFilename ? [uploadImage(medalFilename, medal.bytes, "image/png", overallSignal)] : []),
     ]);
     console.info("images_saved", { id: input.id, elapsedMs: Date.now() - started });
     return { id: input.id, imageFilename, medalFilename, skill: character.text };

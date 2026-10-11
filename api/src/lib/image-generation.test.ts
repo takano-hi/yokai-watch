@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { generateAndSaveImages } from "./image-generation";
 import { uploadImage } from "./r2";
 
@@ -63,3 +63,5 @@ describe("generateAndSaveImages", () => {
     expect(uploadImage).not.toHaveBeenCalled();
   });
 });
+
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });

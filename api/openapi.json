@@ -49,7 +49,7 @@
       },
       "post": {
         "summary": "妖怪生成・登録",
-        "description": "写真と名前を検証して202と登録予定のIDを返す。応答後にVercelで画像生成とR2保存を完了し、その結果でDB登録する。GET /monsters/{id}の200で登録完了を確認できる。登録前・生成失敗後は404。",
+        "description": "写真と名前を検証して202と登録予定のIDを返す。応答後に同じHerokuプロセスでOpenAIの画像生成とR2保存を完了し、その後にDB登録する。GET /monsters/{id}の200で登録完了を確認できる。登録前・生成失敗後は404。",
         "requestBody": {
           "required": true,
           "content": {
@@ -131,7 +131,7 @@
             "description": "JPEG / PNG以外または画像シグネチャが不正"
           },
           "503": {
-            "description": "Vercel API接続先またはトークンが未設定"
+            "description": "既存のOpenAI・R2設定が不備"
           }
         }
       }

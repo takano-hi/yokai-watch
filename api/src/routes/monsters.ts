@@ -3,8 +3,8 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
-import { generateImages, GenerationClientError, getGenerationConfig } from "../lib/image-generation-client";
-import { MAX_PHOTO_BYTES, validateGenerationInput } from "../lib/generation-input";
+import { generateAndSaveImages, getGenerationConfig } from "../lib/image-generation";
+import { GenerationError, MAX_PHOTO_BYTES, validateGenerationInput } from "../lib/generation-input";
 
 const router = Router();
 const upload = multer({
@@ -32,8 +32,8 @@ router.post("/", (req: Request, res: Response, next) => {
   }
   try {
     getGenerationConfig();
-  } catch {
-    res.status(503).json({ success: false, message: "画像生成APIが設定されていません" });
+  } catch (error) {
+    res.status(503).json({ success: false, message: error instanceof GenerationError ? error.message : "画像生成サービスが設定されていません" });
     return;
   }
 
@@ -43,8 +43,9 @@ router.post("/", (req: Request, res: Response, next) => {
 
   let stage = "generation";
   try {
-    // The generation API responds only after all generated images are saved to R2.
-    const generated = await generateImages({ id, ...input.value });
+    const { photo, ...values } = input.value;
+    // Continue in this process after responding; register only once R2 saves finish.
+    const generated = await generateAndSaveImages({ id, ...values, bytes: photo.buffer, mimeType: photo.mimetype });
     stage = "registration";
     const { name, personality } = input.value;
     await prisma.monster.create({
@@ -60,7 +61,7 @@ router.post("/", (req: Request, res: Response, next) => {
     console.error("monster_processing_failed", {
       id, stage, elapsedMs: Date.now() - started,
       errorType: error instanceof Error ? error.name : "UnknownError",
-      code: error instanceof GenerationClientError ? error.code : undefined,
+      code: error instanceof GenerationError ? error.code : undefined,
     });
   }
 });

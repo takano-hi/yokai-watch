@@ -1,5 +1,12 @@
 export const MAX_PHOTO_BYTES = 4_000_000;
 
+export class GenerationError extends Error {
+  constructor(public status: number, message: string, public code: string) {
+    super(message);
+    this.name = "GenerationError";
+  }
+}
+
 export function validateGenerationInput(
   body: Record<string, unknown>,
   photo?: { buffer: Buffer; mimetype: string },
