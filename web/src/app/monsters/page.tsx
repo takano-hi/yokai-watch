@@ -36,7 +36,7 @@ function MedalGrid({
         return (
           <div
             key={i}
-            style={{ width: "80px", cursor: monster ? "pointer" : "default" }}
+            style={{ width: "80px", cursor: monster ? "pointer" : "default", borderRadius : "50%", overflow : "hidden" }}
             onClick={() => monster && router.push(`/monsters/${monster.id}`)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -147,7 +147,7 @@ export default function MonstersPage() {
 
         {/* ボタン: スライドコンテナの外に固定配置 */}
         <button
-          onClick={() => router.push("/")}
+          onClick={() => {router.push("/");window.location.reload()}}
           style={{
             position: "absolute",
             bottom: "24px",

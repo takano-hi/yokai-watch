@@ -24,6 +24,15 @@ export async function getMonsters(): Promise<Monster[]> {
   return Array.isArray(monsters) ? monsters as Monster[] : [];
 }
 
+export async function getMonster(id: string): Promise<Monster | null> {
+  const res = await fetch(`${BASE_URL}/monsters/${encodeURIComponent(id)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("妖怪情報を取得できませんでした");
+
+  const monster: unknown = await res.json();
+  return monster && typeof monster === "object" ? monster as Monster : null;
+}
+
 export function getMonsterImageUrl(filename: string | null): string | null {
   if (!filename) return null;
   if (/^(?:https?:)?\/\//.test(filename) || filename.startsWith("data:")) return filename;

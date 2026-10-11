@@ -3,20 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateScreen } from "./_components/create-screen";
-import { ResultScreen } from "./_components/result-screen";
+import { LoadingScreen } from "./_components/loading-screen";
+import { WelcomeScreen } from "./_components/welcome-screen";
 import { postMonster } from "@/lib/api";
 
-type ViewStatus = "idle" | "sending" | "done" | "error";
+type ViewStatus = "welcome" | "idle" | "sending" | "error";
 
 export default function Home() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [generated, setGenerated] = useState<string | null>(null);
-  const [generatedMedal, setGeneratedMedal] = useState<string | null>(null);
-  const [status, setStatus] = useState<ViewStatus>("idle");
+  const [status, setStatus] = useState<ViewStatus>("welcome");
   const [errorMessage, setErrorMessage] = useState("");
+  const [personality, setPersonality] = useState("");
   const submission = useRef<AbortController | null>(null);
 
   useEffect(() => () => submission.current?.abort(), []);
@@ -26,40 +26,33 @@ export default function Home() {
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    if (new URLSearchParams(window.location.search).get("preview-result") !== "1") return;
+  if (status === "welcome") {
+    return <WelcomeScreen onStart={() => setStatus("idle")} />;
+  }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setName("こちょちょ");
-    setGenerated("/result-sample.png");
-    setGeneratedMedal("/result-medal.png");
-    setStatus("done");
-  }, []);
+  if (status === "sending") {
+    return <LoadingScreen />;
+  }
 
   function handleCapture(file: File) {
     setPhoto(file);
     setPreview(URL.createObjectURL(file));
-    setGenerated(null);
-    setGeneratedMedal(null);
     setErrorMessage("");
     setStatus("idle");
   }
 
   async function handleSubmit() {
-    if (!photo || !name.trim() || submission.current) return;
+    if (!photo || !name.trim() || !personality.trim() || submission.current) return;
 
     const controller = new AbortController();
     submission.current = controller;
     setStatus("sending");
     setErrorMessage("");
     try {
-      const data = await postMonster(name.trim(), photo, "", "", controller.signal);
+      const data = await postMonster(name.trim(), photo, "", personality.trim(), controller.signal);
       if (controller.signal.aborted) return;
       if (data.success) {
-        setGenerated(data.imageUrl);
-        setGeneratedMedal(data.medalUrl);
-        setStatus("done");
+        router.push(`/monsters/${encodeURIComponent(data.monster.id)}`);
       } else {
         setErrorMessage(data.message);
         setStatus("error");
@@ -73,27 +66,18 @@ export default function Home() {
     }
   }
 
-  if (status === "done" && generated) {
-    return (
-      <ResultScreen
-        name={name}
-        characterImage={generated}
-        medalImage={generatedMedal}
-        onOpenDirectory={() => router.push("/monsters")}
-      />
-    );
-  }
-
   return (
     <CreateScreen
       name={name}
       preview={preview}
-      canSubmit={Boolean(photo && name.trim())}
-      isSending={status === "sending"}
+      canSubmit={Boolean(photo && name.trim() && personality.trim())}
+      isSending={false}
       errorMessage={status === "error" ? errorMessage : ""}
       onCapture={handleCapture}
       onNameChange={setName}
       onSubmit={handleSubmit}
+      personality={personality}
+      onPersonalityChange={setPersonality}
     />
   );
 }

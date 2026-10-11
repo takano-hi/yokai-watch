@@ -1,53 +1,152 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getMonsterImageUrl, type Monster } from "@/lib/api";
+import { getMonster, getMonsterImageUrl, type Monster } from "@/lib/api";
 import { BrandMark } from "./brand-mark";
 
-const detailCss = `
-.monster-detail-view { min-height:100svh; background-color:#9ac7e9; background-image:url("/youkai-pattern.png"),url("/youkai-gradient.png"); background-position:center top; background-repeat:repeat-y,no-repeat; background-size:100% auto,100% 100%; }
-.monster-detail-banner { height:21.2vw; display:flex; align-items:center; justify-content:center; background:linear-gradient(110deg,#41c7e8,#7dbef1); }
-.monster-detail-content { width:min(100% - 40px,760px); margin:0 auto; padding:28px 0 48px; text-align:center; }
-.monster-detail-content>h2 { margin:0 0 18px; color:white; font-family:"Youkai Display",sans-serif; font-size:clamp(32px,8vw,64px); }
-.monster-detail-portrait { display:block; width:min(76vw,420px); height:min(76vw,420px); object-fit:contain; margin:0 auto; border-radius:36px; background:#ffffff75; filter:drop-shadow(0 12px 16px #286d9630); }
-.monster-detail-medal { display:block; width:clamp(86px,24vw,150px); height:clamp(86px,24vw,150px); object-fit:contain; margin:-54px 4% 0 auto; position:relative; }
-.monster-detail-name { margin:10px 0 0; color:white; font-family:"Youkai Display",sans-serif; font-size:clamp(36px,9vw,70px); text-shadow:0 2px 4px #286d9630; }
-.monster-detail-description { margin:12px 0 0; padding:18px 20px; border-radius:24px; background:#ffffffc7; color:#268bb8; font-family:"Youkai Display",sans-serif; font-size:clamp(17px,4vw,24px); line-height:1.7; }
-.monster-detail-back { display:block; min-width:150px; margin:26px auto 0; padding:11px 24px; border:1px solid #fffc; border-radius:999px; background:#ffffff47; color:white; font-family:"Youkai Display",sans-serif; font-size:20px; cursor:pointer; }
-`;
+type LoadResult =
+  | { id: string; status: "ready"; monster: Monster }
+  | { id: string; status: "not-found" }
+  | { id: string; status: "error" };
 
-type MonsterDetailScreenProps = {
-  monster: Monster;
-};
-
-export function MonsterDetailScreen({ monster }: MonsterDetailScreenProps) {
+export function MonsterDetailScreen({ id }: { id: string }) {
   const router = useRouter();
-  const portraitImage = getMonsterImageUrl(monster.imageFilename) ?? "/hero-sample.jpg";
+  const [loadResult, setLoadResult] = useState<LoadResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getMonster(id).then((monster) => {
+      if (cancelled) return;
+      setLoadResult(monster
+        ? { id, status: "ready", monster }
+        : { id, status: "not-found" });
+    }).catch(() => {
+      if (cancelled) return;
+      setLoadResult({ id, status: "error" });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, attempt]);
+
+  const currentResult = loadResult?.id === id ? loadResult : null;
+
+  if (!currentResult) {
+    return <MonsterDetailLoading />;
+  }
+
+  if (currentResult.status === "not-found") {
+    return (
+      <DetailFeedback
+        message="妖怪が見つかりませんでした。図鑑一覧から選び直してください。"
+        onBack={() => router.push("/monsters")}
+      />
+    );
+  }
+
+  if (currentResult.status === "error") {
+    return (
+      <DetailFeedback
+        message="妖怪情報を取得できませんでした。通信環境を確認して、もう一度お試しください。"
+        onBack={() => router.push("/monsters")}
+        onRetry={() => setAttempt((value) => value + 1)}
+      />
+    );
+  }
+
+  const { monster } = currentResult;
+  const characterImage = getMonsterImageUrl(monster.imageFilename) ?? "/hero-sample.jpg";
   const medalImage = getMonsterImageUrl(monster.medalFilename);
 
   return (
-    <main className="monster-detail-view">
-      <style>{detailCss}</style>
-      <div className="monster-detail-banner"><BrandMark compact /></div>
-      <section className="monster-detail-content" aria-labelledby="monster-detail-name">
-        <h2>妖怪プロフィール</h2>
+    <main className="result-view monster-detail-view">
+      <div className="result-banner">
+        <BrandMark compact />
+      </div>
+
+      <section className="result-stage" aria-labelledby="monster-detail-name">
+        <h2 className="result-monster-name" id="monster-detail-name">{monster.name}</h2>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="monster-detail-portrait"
-          src={portraitImage}
-          alt={`${monster.name}の妖怪`}
-        />
+        <img className="result-character" src={characterImage} alt={`${monster.name}の妖怪`} />
         {medalImage && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            className="monster-detail-medal"
-            src={medalImage}
-            alt={`${monster.name}の妖怪メダル`}
-          />
+          <img className="result-medal" src={medalImage} alt={`${monster.name}の妖怪メダル`} />
         )}
-        <h3 className="monster-detail-name" id="monster-detail-name">{monster.name}</h3>
-        <p className="monster-detail-description">{monster.description ?? "写真からうまれた、なかま妖怪。"}</p>
-        <button className="monster-detail-back" onClick={() => router.push("/monsters")}><span aria-hidden="true">‹</span> 図鑑一覧へ</button>
+      </section>
+
+      <section className="result-details monster-detail-details" aria-label={`${monster.name}の妖怪情報`}>
+        <Detail value={monster.skill} label="スキル" />
+        <Detail value={monster.personality} label="性格" />
+        {monster.description && <Detail value={monster.description} label="説明" description />}
+        <button className="directory-button" onClick={() => router.push("/monsters")}>
+          図鑑一覧へ
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" /></svg>
+        </button>
+      </section>
+    </main>
+  );
+}
+
+export function MonsterDetailLoading() {
+  return (
+    <main className="result-view monster-detail-view">
+      <div className="result-banner">
+        <BrandMark compact />
+      </div>
+      <section className="monster-detail-feedback" role="status" aria-live="polite" aria-busy="true">
+        <span className="loading-dot" aria-hidden="true" />
+        <p>妖怪情報を読み込み中...</p>
+      </section>
+    </main>
+  );
+}
+
+function Detail({
+  value,
+  label,
+  description = false,
+}: {
+  value: string | null | undefined;
+  label: string;
+  description?: boolean;
+}) {
+  const displayValue = value?.trim() || "まだわからない";
+
+  return (
+    <div className="result-detail monster-detail-item">
+      <span className="detail-label">{label}</span>
+      <p className={`detail-value monster-detail-value${description ? " monster-detail-description" : ""}`}>
+        {displayValue}
+      </p>
+    </div>
+  );
+}
+
+function DetailFeedback({
+  message,
+  isLoading = false,
+  onBack,
+  onRetry,
+}: {
+  message: string;
+  isLoading?: boolean;
+  onBack: () => void;
+  onRetry?: () => void;
+}) {
+  return (
+    <main className="result-view monster-detail-view">
+      <div className="result-banner">
+        <BrandMark compact />
+      </div>
+      <section className="monster-detail-feedback" aria-live="polite" aria-busy={isLoading}>
+        {isLoading && <span className="loading-dot" aria-hidden="true" />}
+        <p>{message}</p>
+        {onRetry && <button className="directory-button" onClick={onRetry}>もう一度試す</button>}
+        <button className="directory-button" onClick={onBack}>図鑑一覧へ</button>
       </section>
     </main>
   );
