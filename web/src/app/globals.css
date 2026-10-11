@@ -567,3 +567,7 @@ button { -webkit-tap-highlight-color: transparent; }
   object-fit: cover;
 }
 
+.result-medal {
+  border-radius: 50%;
+  overflow: hidden;
+}
