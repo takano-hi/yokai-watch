@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/mock-db";
+import { GenerationError, parseGenerationInput } from "@/lib/generation-input";
 
 export async function GET() {
   const monsters = [...db.values()].sort((a, b) =>
@@ -9,31 +10,29 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
-  const name = formData.get("name");
-  const photo = formData.get("photo");
-
-  if (!name || !photo) {
-    return NextResponse.json(
-      { success: false, message: "name と photo は必須です" },
-      { status: 400 }
-    );
+  try {
+    const { name, skill, personality } = await parseGenerationInput(await req.formData(), false);
+    const id = crypto.randomUUID();
+    const monster = {
+      id,
+      name,
+      imageFilename: "mock-monster.svg",
+      bookId: null,
+      medalFilename: "mock-medal.svg",
+      description: null,
+      skill,
+      personality,
+    };
+    after(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      db.set(id, monster);
+    });
+    return NextResponse.json({ id, status: "processing" }, {
+      status: 202, headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: error instanceof GenerationError ? error.message : "送信形式が正しくありません" }, {
+      status: error instanceof GenerationError ? error.status : 400,
+    });
   }
-
-  await new Promise((r) => setTimeout(r, 800));
-
-  const monster = {
-    id: crypto.randomUUID(),
-    name: name as string,
-    imageFilename: "mock-monster.svg",
-    bookId: null,
-    medalFilename: "mock-medal.svg",
-    description: null,
-    skill: "",
-    personality: "",
-  };
-
-  db.set(monster.id, monster);
-
-  return NextResponse.json(monster, { status: 201 });
 }

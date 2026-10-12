@@ -48,29 +48,76 @@ export function getMedalImageUrl(medalFilename: string): string {
 export async function postMonster(
   name: string,
   file: File,
-  personality: string = "",
+  skill = "",
+  personality = "",
+  signal?: AbortSignal,
 ): Promise<PostMonsterResponse> {
   const formData = new FormData();
   formData.append("name", name);
   formData.append("photo", file);
-  formData.append("skill", "");
+  formData.append("skill", skill);
   formData.append("personality", personality);
 
   const res = await fetch(`${BASE_URL}/monsters`, {
     method: "POST",
     body: formData,
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
-    const data = await res.json();
-    return { success: false, message: data.message ?? "送信に失敗しました" };
+    const data = await res.json().catch(() => null);
+    return { success: false, message: data?.message ?? "送信に失敗しました" };
   }
 
-  const monster: Monster = await res.json();
+  if (res.status !== 202) return { success: false, message: "受付応答が正しくありません" };
+  const accepted: unknown = await res.json();
+  if (!accepted || typeof accepted !== "object" || !("id" in accepted) ||
+      typeof accepted.id !== "string" || !("status" in accepted) || accepted.status !== "processing") {
+    return { success: false, message: "受付応答が正しくありません" };
+  }
+  const deadline = Date.now() + 330_000;
+  let monster: Monster | undefined;
+  while (Date.now() < deadline) {
+    signal?.throwIfAborted();
+    const timeout = AbortSignal.timeout(Math.min(10_000, deadline - Date.now()));
+    const response = await fetch(`${BASE_URL}/monsters/${encodeURIComponent(accepted.id)}`, {
+      cache: "no-store",
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    if (response.status === 200) {
+      const result: unknown = await response.json();
+      if (!result || typeof result !== "object" || !("id" in result) || result.id !== accepted.id ||
+          !("imageFilename" in result) || typeof result.imageFilename !== "string" ||
+          !("medalFilename" in result) || (result.medalFilename !== null && typeof result.medalFilename !== "string")) {
+        return { success: false, message: "登録結果の応答が正しくありません" };
+      }
+      monster = result as Monster;
+      break;
+    }
+    if (response.status !== 404) return { success: false, message: "登録結果を確認できませんでした" };
+    await waitForPoll(Math.min(3_000, Math.max(0, deadline - Date.now())), signal);
+  }
+  if (!monster) return { success: false, message: "時間内に登録を確認できませんでした" };
   return {
     success: true,
     monster,
     imageUrl: getMonsterImageUrl(monster.imageFilename) ?? "",
     medalUrl: getMonsterImageUrl(monster.medalFilename),
   };
+}
+
+function waitForPoll(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }

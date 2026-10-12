@@ -2,6 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## 環境変数
 
+画像生成とR2保存はHerokuのAPIで実行します。フロントは`POST /monsters`の202受付IDを読み、`GET /monsters/:id`でDB登録完了を確認します。API契約とcurl例は[仕様書](../docs/image-generation-deferred-registration.md)に記載しています。
+
+OpenAI・R2の認証情報をWebへ移す必要はありません。フロント接続は既存の`NEXT_PUBLIC_API_URL`と`NEXT_PUBLIC_R2_BASE_URL`を使います。
+
+```bash
+docker compose exec -T web npm test
+docker compose exec -T web npx tsc --noEmit
+docker compose exec -T web npm run lint
+docker compose exec -T web npm run build
+```
+
 `.env-sample` をコピーして `.env` を作成し、各キーに値を設定してください。
 
 ```bash

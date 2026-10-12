@@ -16,7 +16,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": true }
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
                   }
                 }
               }
@@ -35,7 +38,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Monster" }
+                  "items": {
+                    "$ref": "#/components/schemas/Monster"
+                  }
                 }
               }
             }
@@ -44,31 +49,37 @@
       },
       "post": {
         "summary": "妖怪生成・登録",
-        "description": "写真と妖怪名を送ると ChatGPT で妖怪キャラクター画像とメダル画像を生成し、R2 に保存した上で monsters レコードを作成する。",
+        "description": "写真と名前を検証して202と登録予定のIDを返す。応答後に同じHerokuプロセスでOpenAIの画像生成とR2保存を完了し、その後にDB登録する。GET /monsters/{id}の200で登録完了を確認できる。登録前・生成失敗後は404。",
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["name", "photo"],
+                "required": [
+                  "name",
+                  "photo"
+                ],
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "妖怪名"
+                    "description": "妖怪名",
+                    "maxLength": 100
                   },
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "元となる人物写真"
+                    "description": "JPEG / PNGの人物写真1枚。最大4,000,000 bytes。"
                   },
                   "skill": {
                     "type": "string",
-                    "description": "とくぎの元になる文言（任意）。ChatGPT に渡してとくぎを生成させる"
+                    "description": "とくぎの元になる文言（任意）。ChatGPT に渡してとくぎを生成させる",
+                    "maxLength": 500
                   },
                   "personality": {
                     "type": "string",
-                    "description": "せいかく（任意）。そのまま保存される"
+                    "description": "せいかく（任意）。そのまま保存される",
+                    "maxLength": 500
                   }
                 }
               }
@@ -76,29 +87,51 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "生成・保存成功",
+          "202": {
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Monster" }
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "processing"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                }
+              }
+            },
+            "description": "受付完了（この時点ではDB未登録）",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
               }
             }
           },
           "400": {
-            "description": "name または photo が未指定",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
+            "description": "入力項目・送信形式の不備"
           },
-          "422": {
-            "description": "画像生成失敗（人物不在・API エラー）",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
-              }
-            }
+          "413": {
+            "description": "写真が4,000,000 bytesを超過"
+          },
+          "415": {
+            "description": "JPEG / PNG以外または画像シグネチャが不正"
+          },
+          "503": {
+            "description": "既存のOpenAI・R2設定が不備"
           }
         }
       }
@@ -109,7 +142,10 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "schema": { "type": "string", "format": "uuid" }
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
         }
       ],
       "get": {
@@ -119,7 +155,9 @@
             "description": "妖怪情報",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Monster" }
+                "schema": {
+                  "$ref": "#/components/schemas/Monster"
+                }
               }
             }
           },
@@ -127,7 +165,9 @@
             "description": "妖怪が見つからない",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -141,9 +181,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "properties": {
-                  "name": { "type": "string", "description": "新しい妖怪名" }
+                  "name": {
+                    "type": "string",
+                    "description": "新しい妖怪名"
+                  }
                 }
               }
             }
@@ -154,7 +199,9 @@
             "description": "更新後の妖怪情報",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Monster" }
+                "schema": {
+                  "$ref": "#/components/schemas/Monster"
+                }
               }
             }
           },
@@ -162,7 +209,9 @@
             "description": "name が空",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -170,7 +219,9 @@
             "description": "妖怪が見つからない",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -187,7 +238,9 @@
             "description": "妖怪が見つからない",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -199,23 +252,58 @@
     "schemas": {
       "Monster": {
         "type": "object",
-        "required": ["id", "name", "imageFilename", "skill", "personality"],
+        "required": [
+          "id",
+          "name",
+          "imageFilename",
+          "skill",
+          "personality"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "name": { "type": "string" },
-          "imageFilename": { "type": "string", "example": "550e8400-e29b-41d4-a716-446655440000.png" },
-          "medalFilename": { "type": "string", "nullable": true },
-          "bookId": { "type": "string", "format": "uuid", "nullable": true },
-          "skill": { "type": "string", "default": "" },
-          "personality": { "type": "string", "default": "" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imageFilename": {
+            "type": "string",
+            "example": "550e8400-e29b-41d4-a716-446655440000.png"
+          },
+          "medalFilename": {
+            "type": "string",
+            "nullable": true
+          },
+          "bookId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "skill": {
+            "type": "string",
+            "default": ""
+          },
+          "personality": {
+            "type": "string",
+            "default": ""
+          }
         }
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["success", "message"],
+        "required": [
+          "success",
+          "message"
+        ],
         "properties": {
-          "success": { "type": "boolean", "example": false },
-          "message": { "type": "string" }
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          }
         }
       }
     }

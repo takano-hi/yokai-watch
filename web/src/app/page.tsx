@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateScreen } from "./_components/create-screen";
 import { LoadingScreen } from "./_components/loading-screen";
@@ -17,6 +17,9 @@ export default function Home() {
   const [status, setStatus] = useState<ViewStatus>("welcome");
   const [errorMessage, setErrorMessage] = useState("");
   const [personality, setPersonality] = useState("");
+  const submission = useRef<AbortController | null>(null);
+
+  useEffect(() => () => submission.current?.abort(), []);
 
   useEffect(() => {
     if (!preview) return;
@@ -39,12 +42,15 @@ export default function Home() {
   }
 
   async function handleSubmit() {
-    if (!photo || !name.trim()) return;
+    if (!photo || !name.trim() || !personality.trim() || submission.current) return;
 
+    const controller = new AbortController();
+    submission.current = controller;
     setStatus("sending");
     setErrorMessage("");
     try {
-      const data = await postMonster(name.trim(), photo, personality);
+      const data = await postMonster(name.trim(), photo, "", personality.trim(), controller.signal);
+      if (controller.signal.aborted) return;
       if (data.success) {
         router.push(`/monsters/${encodeURIComponent(data.monster.id)}`);
         localStorage.setItem("book", (localStorage.getItem("book") || "") + "," + data.monster.id);
@@ -53,8 +59,11 @@ export default function Home() {
         setStatus("error");
       }
     } catch {
+      if (controller.signal.aborted) return;
       setErrorMessage("送信に失敗しました。通信環境を確認して、もう一度お試しください。");
       setStatus("error");
+    } finally {
+      submission.current = null;
     }
   }
 

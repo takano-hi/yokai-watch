@@ -1,28 +1,10 @@
 import request from "supertest";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import app from "../app";
 import prisma from "../lib/prisma";
+import { getR2Config, uploadImage } from "../lib/r2";
 
-vi.mock("../lib/r2", () => ({
-  uploadImage: vi.fn().mockResolvedValue(undefined),
-}));
-
-const mockOpenAI = (body: object, status = 200) => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(body),
-      status,
-    })
-  );
-};
-
-const imageGenerationResponse = (base64 = "abc123", text?: string) => ({
-  output: [
-    { type: "image_generation_call", result: base64 },
-    ...(text !== undefined ? [{ type: "message", content: [{ type: "output_text", text }] }] : []),
-  ],
-});
+vi.mock("../lib/r2", () => ({ getR2Config: vi.fn(), uploadImage: vi.fn() }));
 
 describe("GET /monsters", () => {
   it("データがないとき空配列を返す", async () => {
@@ -83,125 +65,140 @@ describe("GET /monsters", () => {
 });
 
 describe("POST /monsters", () => {
-  const photoBuffer = Buffer.from("fake image data");
+  const photoBuffer = Buffer.from([255, 216, 255, 224, 0, 0]);
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const submit = () => request(app).post("/monsters")
+    .field("name", "ジバニャン").attach("photo", photoBuffer, "photo.jpg");
+  const generated = () => Response.json({ output: [
+    { type: "image_generation_call", result: png.toString("base64") },
+    { type: "message", content: [{ text: "ひゃくれつ肉球\n" }] },
+  ] });
 
-  it("name がないとき 400 を返す", async () => {
-    const res = await request(app)
-      .post("/monsters")
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("CHATGPT_API_KEY", "existing-openai-key");
+    vi.stubEnv("IMAGE_GENERATION_API_URL", "");
+    vi.stubEnv("IMAGE_GENERATION_API_TOKEN", "");
+    vi.mocked(getR2Config).mockReset();
+    vi.mocked(uploadImage).mockReset().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => generated()));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks();
+  });
+
+  it("nameがなければ400", async () => {
+    expect((await request(app).post("/monsters").attach("photo", photoBuffer, "photo.jpg")).status).toBe(400);
+  });
+  it("photoがなければ400", async () => {
+    expect((await request(app).post("/monsters").field("name", "ジバニャン")).status).toBe(400);
+  });
+  it("空白の名前は400", async () => {
+    expect((await request(app).post("/monsters").field("name", "   ").attach("photo", photoBuffer, "photo.jpg")).status).toBe(400);
+  });
+  it("写真の実形式が不正なら415", async () => {
+    expect((await request(app).post("/monsters").field("name", "demo").attach("photo", Buffer.from("not a jpeg"), "photo.jpg")).status).toBe(415);
+  });
+  it("4MBを超える写真は413", async () => {
+    expect((await request(app).post("/monsters").field("name", "demo").attach("photo", Buffer.alloc(4_000_001), "photo.jpg")).status).toBe(413);
+  });
+  it("既存OpenAIキー未設定なら受付前に503", async () => {
+    vi.stubEnv("CHATGPT_API_KEY", "");
+    expect((await submit()).status).toBe(503);
+    expect(await prisma.monster.count()).toBe(0);
+  });
+  it("既存R2設定が不備なら受付前に503", async () => {
+    vi.mocked(getR2Config).mockImplementation(() => { throw new Error("not configured"); });
+    expect((await submit()).status).toBe(503);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("追加接続設定なしで202を先に返し、すべてのR2保存後に発行済みIDで登録する", async () => {
+    const replies: ((response: Response) => void)[] = [];
+    const saves: (() => void)[] = [];
+    vi.mocked(fetch).mockImplementation(() => new Promise<Response>((resolve) => replies.push(resolve)));
+    vi.mocked(uploadImage).mockImplementation(() => new Promise<void>((resolve) => saves.push(resolve)));
+    const res = await request(app).post("/monsters").field("name", " ジバニャン ")
+      .field("skill", "ねこパンチ").field("personality", "めんどくさがり")
       .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe("name フィールドが見つかりません");
-  });
-
-  it("photo がないとき 400 を返す", async () => {
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン");
-
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe("photo フィールドが見つかりません");
-  });
-
-  it("ChatGPT がエラーを返したとき 422 を返す", async () => {
-    mockOpenAI({ error: { message: "API error" } });
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(422);
-    expect(res.body.message).toBe("API error");
-  });
-
-  it("人物が写っていないとき 422 を返す", async () => {
-    mockOpenAI({
-      output: [{ type: "message", content: [{ text: "NO_PERSON" }] }],
+    expect(res.status).toBe(202);
+    expect(res.body.status).toBe("processing");
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(await prisma.monster.count()).toBe(0);
+    expect((await request(app).get(`/monsters/${res.body.id}`)).status).toBe(404);
+    expect(replies).toHaveLength(1);
+    replies[0](generated());
+    await vi.waitFor(() => expect(replies).toHaveLength(2));
+    for (const [url, init] of vi.mocked(fetch).mock.calls) {
+      expect(url).toBe("https://api.openai.com/v1/responses");
+      expect(init?.headers).toEqual(expect.objectContaining({ Authorization: "Bearer existing-openai-key" }));
+    }
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => String(init?.body).includes("めんどくさがり"))).toBe(true);
+    const bodies = vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photoBuffer.toString("base64")}`);
+    expect(bodies[1].input[0].content[0].image_url).toBe(`data:image/png;base64,${png.toString("base64")}`);
+    expect(bodies[1].input[0].content[1]).toMatchObject({ type: "input_image", image_url: expect.stringMatching(/^data:image\/png;base64,/) });
+    replies[1](generated());
+    await vi.waitFor(() => expect(saves).toHaveLength(2));
+    saves[0]();
+    expect(await prisma.monster.count()).toBe(0);
+    saves[1]();
+    await vi.waitFor(async () => {
+      const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
+      expect(saved?.name).toBe("ジバニャン");
+      expect(saved?.personality).toBe("めんどくさがり");
+      expect(saved?.skill).toBe("ひゃくれつ肉球");
+      expect(saved?.imageFilename).toBe(`${res.body.id}.png`);
     });
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(422);
-    expect(res.body.message).toBe("人物を特定できませんでした");
+    const registered = await request(app).get(`/monsters/${res.body.id}`);
+    expect(registered.status).toBe(200);
+    expect(registered.headers["cache-control"]).toBe("no-store");
   });
 
-  it("画像生成に成功したとき monster を DB に保存して 201 を返す", async () => {
-    mockOpenAI(imageGenerationResponse());
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(201);
-    expect(res.body.name).toBe("ジバニャン");
-    expect(res.body.id).toBeDefined();
-    expect(res.body.imageFilename).toMatch(/^[\w-]+\.png$/);
+  it("OpenAI生成失敗後はDB登録しない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockImplementation(async () => new Response("failed", { status: 500 }));
+    expect((await submit()).status).toBe(202);
+    await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(await prisma.monster.count()).toBe(0);
   });
-
-  it("生成された monster が DB に保存されている", async () => {
-    mockOpenAI(imageGenerationResponse());
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
-    expect(saved?.name).toBe("ジバニャン");
-    expect(saved?.imageFilename).toBe(res.body.imageFilename);
+  it("R2保存失敗後はDB登録しない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(uploadImage).mockRejectedValue(new Error("storage failed"));
+    expect((await submit()).status).toBe(202);
+    await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(await prisma.monster.count()).toBe(0);
   });
-
-  it("入力された skill を ChatGPT に渡し、生成されたとくぎを保存する", async () => {
-    mockOpenAI(imageGenerationResponse("abc123", "ひゃくれつ肉球パンチ\n"));
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .field("skill", "ねこパンチ")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(201);
-    expect(res.body.skill).toBe("ひゃくれつ肉球パンチ");
-    const prompts = vi.mocked(fetch).mock.calls.map(([, init]) => String(init?.body));
-    expect(prompts.some((body) => body.includes("ねこパンチ"))).toBe(true);
-    const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
-    expect(saved?.skill).toBe("ひゃくれつ肉球パンチ");
+  it("メダル生成のみの失敗はnullで登録する", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(generated()).mockResolvedValueOnce(new Response("failed", { status: 500 }));
+    const res = await submit();
+    expect(res.status).toBe(202);
+    await vi.waitFor(async () => {
+      const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
+      expect(saved).not.toBeNull(); expect(saved?.medalFilename).toBeNull();
+    });
   });
-
-  it("入力された personality をそのまま保存する", async () => {
-    mockOpenAI(imageGenerationResponse("abc123", "ひゃくれつ肉球"));
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .field("personality", "めんどくさがり")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(201);
-    expect(res.body.personality).toBe("めんどくさがり");
-    const saved = await prisma.monster.findUnique({ where: { id: res.body.id } });
-    expect(saved?.personality).toBe("めんどくさがり");
+  it("OpenAIが非JSONを返したらDB登録しない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockImplementation(async () => new Response("not json"));
+    expect((await submit()).status).toBe(202);
+    await vi.waitFor(() => expect(log).toHaveBeenCalled());
+    expect(await prisma.monster.count()).toBe(0);
   });
-
-  it("テキストも personality もないとき skill と personality は空文字で保存する", async () => {
-    mockOpenAI(imageGenerationResponse());
-
-    const res = await request(app)
-      .post("/monsters")
-      .field("name", "ジバニャン")
-      .attach("photo", photoBuffer, "photo.jpg");
-
-    expect(res.status).toBe(201);
-    expect(res.body.skill).toBe("");
-    expect(res.body.personality).toBe("");
+  it("応答後のDB登録失敗を捕捉する", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const originalCreate = prisma.monster.create;
+    prisma.monster.create = vi.fn().mockRejectedValueOnce(new Error("DB unavailable"));
+    try {
+      expect((await submit()).status).toBe(202);
+      await vi.waitFor(() => expect(log).toHaveBeenCalledWith("monster_processing_failed", expect.objectContaining({ stage: "registration" })));
+      expect(await prisma.monster.count()).toBe(0);
+    } finally { prisma.monster.create = originalCreate; }
   });
 });
-
 describe("GET /monsters/:id", () => {
   let monsterId: string;
 
