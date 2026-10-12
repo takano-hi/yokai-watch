@@ -113,7 +113,8 @@ describe("generateAndSaveImages", () => {
     expect(bodies[0].input[0].content).toHaveLength(2);
     expect(bodies[0].model).toBe("gpt-6-luna");
     expect(bodies[0].tools[0]).toEqual({
-      type: "image_generation", size: "816x816", output_format: "png",
+      type: "image_generation", model: "gpt-image-2.5-sunburst", size: "816x816",
+      background: "transparent", output_format: "png",
     });
     expect(loadReferenceImage).toHaveBeenCalledExactlyOnceWith("medal");
     expect(bodies[1].input[0].content).toEqual([
@@ -123,7 +124,8 @@ describe("generateAndSaveImages", () => {
     ]);
     expect(bodies[1].model).toBe("gpt-6-luna");
     expect(bodies[1].tools[0]).toEqual({
-      type: "image_generation", size: "816x816", output_format: "png",
+      type: "image_generation", model: "gpt-image-2.5-sunburst", size: "816x816",
+      background: "transparent", output_format: "png",
     });
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}.png`, png, "image/png", expect.any(AbortSignal));
     expect(uploadImage).toHaveBeenCalledWith(`${input.id}-medal.png`, medalPng, "image/png", expect.any(AbortSignal));
