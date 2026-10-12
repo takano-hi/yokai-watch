@@ -4,7 +4,7 @@ import { loadReferenceImage } from "./reference-images";
 
 const IMAGE_PROMPTS = {
   character: [
-    (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
+    { referenceImage: "character", prompt: (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
         【フォルム・絵柄】
 ・ジバニャンのような、丸みのある頭と胴体、短めの手足、大きくて分かりやすい顔パーツを持つ、かわいくデフォルメされたマスコット型のフォルムを参考にする。
 ・太くはっきりした輪郭線、シンプルな形、鮮やかな色、親しみやすく表情豊かなデザインにする。
@@ -13,16 +13,16 @@ const IMAGE_PROMPTS = {
 ・毎回同じ猫型にせず、人物の特徴に合う動物型や人型、幻獣型なども取り入れながら、ジバニャンのような親しみやすいマスコット感を保つ。
 ・既存キャラクターをそのままコピーせず、オリジナルのデザインにする。
         背景は透過してください。
-        性格は${personality}です。必ず妖怪キャラクター画像を生成してください。画像とは別に、テキスト部分には性格に合うスキル名だけを返してください。`,
-    (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
+        性格は${personality}です。必ず妖怪キャラクター画像を生成してください。画像とは別に、テキスト部分には性格に合うスキル名だけを返してください。` },
+    { referenceImage: "character2", prompt: (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
 足はお化けにみたいにしてください。
 入力された名前をそのまま妖怪の名前にしてください。
 入力されたこの人を表した言葉をそのまま性格にしてください。
 入力された一言を用いてスキルを作ってください。
 それ以外は出力しないでください。
 背景は透過してください。
-性格は${personality}です。必ず妖怪キャラクター画像を生成してください。画像とは別に、テキスト部分には性格に合うスキル名だけを返してください。`,
-  ],
+性格は${personality}です。必ず妖怪キャラクター画像を生成してください。画像とは別に、テキスト部分には性格に合うスキル名だけを返してください。` },
+  ] as const,
   medal: "1枚目の画像の妖怪キャラクターを、2枚目のメダル元画像の中央にはめ込んでください。" +
         "絶対にキャラクターの上半身がメダルの内側に収まるように配置してください。" +
         "2枚目のメダルの形・枠・背景・配色・装飾はそのまま使ってください。"
@@ -103,8 +103,14 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
   let stage = "generation";
   const started = Date.now();
   try {
-    const characterPrompt = IMAGE_PROMPTS.character[Math.floor(Math.random() * IMAGE_PROMPTS.character.length)];
-    const character = await callOpenAI(input, characterPrompt(input.name, input.personality), generationSignal);
+    const characterTemplate = IMAGE_PROMPTS.character[Math.floor(Math.random() * IMAGE_PROMPTS.character.length)];
+    const referenceImage = await loadReferenceImage(characterTemplate.referenceImage);
+    const character = await callOpenAI(
+      input,
+      "1枚目の人物写真を妖怪にしてください。2枚目はフォルム・絵柄の見本です。人物の特徴は1枚目から、フォルム・絵柄は2枚目から参照してください。\n" +
+        characterTemplate.prompt(input.name, input.personality),
+      generationSignal, referenceImage,
+    );
     const medal = await loadReferenceImage("medal").then((referenceImage) => callOpenAI(
       { ...input, bytes: character.bytes, mimeType: "image/png" },
       IMAGE_PROMPTS.medal, generationSignal, referenceImage,

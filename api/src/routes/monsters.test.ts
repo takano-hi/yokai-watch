@@ -3,8 +3,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import app from "../app";
 import prisma from "../lib/prisma";
 import { getR2Config, uploadImage } from "../lib/r2";
+import { loadReferenceImage } from "../lib/reference-images";
 
 vi.mock("../lib/r2", () => ({ getR2Config: vi.fn(), uploadImage: vi.fn() }));
+vi.mock("../lib/reference-images", () => ({ loadReferenceImage: vi.fn() }));
 
 describe("GET /monsters", () => {
   it("データがないとき空配列を返す", async () => {
@@ -81,6 +83,7 @@ describe("POST /monsters", () => {
     vi.stubEnv("IMAGE_GENERATION_API_TOKEN", "");
     vi.mocked(getR2Config).mockReset();
     vi.mocked(uploadImage).mockReset().mockResolvedValue(undefined);
+    vi.mocked(loadReferenceImage).mockReset().mockResolvedValue(png.toString("base64"));
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => generated()));
   });
 
@@ -127,7 +130,7 @@ describe("POST /monsters", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(await prisma.monster.count()).toBe(0);
     expect((await request(app).get(`/monsters/${res.body.id}`)).status).toBe(404);
-    expect(replies).toHaveLength(1);
+    await vi.waitFor(() => expect(replies).toHaveLength(1));
     replies[0](generated());
     await vi.waitFor(() => expect(replies).toHaveLength(2));
     for (const [url, init] of vi.mocked(fetch).mock.calls) {
@@ -137,6 +140,7 @@ describe("POST /monsters", () => {
     expect(vi.mocked(fetch).mock.calls.some(([, init]) => String(init?.body).includes("めんどくさがり"))).toBe(true);
     const bodies = vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
     expect(bodies[0].input[0].content[0].image_url).toBe(`data:image/jpeg;base64,${photoBuffer.toString("base64")}`);
+    expect(bodies[0].input[0].content[1]).toEqual({ type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` });
     expect(bodies[1].input[0].content[0].image_url).toBe(`data:image/png;base64,${png.toString("base64")}`);
     expect(bodies[1].input[0].content[1]).toMatchObject({ type: "input_image", image_url: expect.stringMatching(/^data:image\/png;base64,/) });
     replies[1](generated());
@@ -162,6 +166,15 @@ describe("POST /monsters", () => {
     expect((await submit()).status).toBe(202);
     await vi.waitFor(() => expect(log).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(await prisma.monster.count()).toBe(0);
+  });
+  it("characterの見本読み込み失敗後は生成・保存・DB登録しない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(loadReferenceImage).mockRejectedValue(new Error("missing character reference"));
+    expect((await submit()).status).toBe(202);
+    await vi.waitFor(() => expect(log).toHaveBeenCalledWith("monster_processing_failed", expect.any(Object)));
+    expect(fetch).not.toHaveBeenCalled();
     expect(uploadImage).not.toHaveBeenCalled();
     expect(await prisma.monster.count()).toBe(0);
   });

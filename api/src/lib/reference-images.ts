@@ -4,6 +4,7 @@ import { resolve } from "path";
 // src/lib と dist/lib のどちらからも同じPNGファイルを参照する。
 const REFERENCE_IMAGE_PATHS = {
   character: resolve(__dirname, "../../src/lib/reference-images/character.png"),
+  character2: resolve(__dirname, "../../src/lib/reference-images/character-2.png"),
   medal: resolve(__dirname, "../../src/lib/reference-images/medal.png"),
 } as const;
 
