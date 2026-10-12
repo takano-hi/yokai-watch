@@ -109,7 +109,7 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
     const referenceImage = await loadReferenceImage(characterTemplate.referenceImage);
     const character = await callOpenAI(
       input,
-      "1枚目の人物写真を妖怪にしてください。2枚目はフォルム・絵柄の見本です。人物の特徴は1枚目から、フォルム・絵柄は2枚目から参照してください。\n" +
+      "1枚目の人物写真を妖怪にしてください。2枚目はキャラクターデザイン・フォルム・絵柄の見本です。人物の特徴は1枚目から、フォルム・絵柄は2枚目から参照してください。\n" +
         characterTemplate.prompt(input.name, input.personality),
       generationSignal, referenceImage,
     );
