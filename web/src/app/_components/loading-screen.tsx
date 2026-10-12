@@ -4,7 +4,7 @@ export function LoadingScreen() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="generation-loading-poster"
-        src="/generation-loading.png"
+        src="/generation-loading.gif"
         alt="ただいま妖怪変化中。ちょっと待ってね。"
       />
     </main>
