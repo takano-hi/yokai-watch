@@ -53,6 +53,7 @@ export default function Home() {
       if (controller.signal.aborted) return;
       if (data.success) {
         router.push(`/monsters/${encodeURIComponent(data.monster.id)}`);
+        localStorage.setItem("book", (localStorage.getItem("book") || "") + "," + data.monster.id);
       } else {
         setErrorMessage(data.message);
         setStatus("error");

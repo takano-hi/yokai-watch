@@ -151,7 +151,7 @@ export function CreateScreen({
               placeholder="妖怪のなまえを入力"
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
-              maxLength={40}
+              maxLength={7}
               autoComplete="off"
             />
             <span className="name-sparkle" aria-hidden="true">✧</span>

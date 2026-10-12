@@ -43,7 +43,7 @@ export function MonsterDetailScreen({ id }: { id: string }) {
     return (
       <DetailFeedback
         message="妖怪が見つかりませんでした。図鑑一覧から選び直してください。"
-        onBack={() => router.push("/monsters")}
+        onBack={() => router.push("/book")}
       />
     );
   }
@@ -52,7 +52,7 @@ export function MonsterDetailScreen({ id }: { id: string }) {
     return (
       <DetailFeedback
         message="妖怪情報を取得できませんでした。通信環境を確認して、もう一度お試しください。"
-        onBack={() => router.push("/monsters")}
+        onBack={() => router.push("/book")}
         onRetry={() => setAttempt((value) => value + 1)}
       />
     );
@@ -82,7 +82,7 @@ export function MonsterDetailScreen({ id }: { id: string }) {
         <Detail value={monster.skill} label="スキル" />
         <Detail value={monster.personality} label="性格" />
         {monster.description && <Detail value={monster.description} label="説明" description />}
-        <button className="directory-button" onClick={() => router.push("/monsters")}>
+        <button className="directory-button" onClick={() => router.push("/book")}>
           図鑑一覧へ
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 4v16l13-8z" /></svg>
         </button>

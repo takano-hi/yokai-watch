@@ -357,7 +357,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .result-monster-name {
   position: absolute;
   z-index: 2;
-  top: 6vw;
+  top: 16vw;
   left: 7vw;
   max-width: 92vw;
   margin: 0;
@@ -375,10 +375,10 @@ button { -webkit-tap-highlight-color: transparent; }
 .result-character {
   position: absolute;
   z-index: 1;
-  top: 25vw;
-  left: 7vw;
-  width: 84vw;
-  height: 94vw;
+  top: 15vw;
+  left: 0;
+  width: 100vw;
+  height: 100vw;
   object-fit: contain;
   filter: drop-shadow(0 12px 14px rgba(48, 103, 142, .14));
 }
