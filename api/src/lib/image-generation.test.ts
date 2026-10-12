@@ -12,6 +12,8 @@ const characterTemplates = {
   character: Buffer.concat([png, Buffer.from("character-1")]).toString("base64"),
   character2: Buffer.concat([png, Buffer.from("character-2")]).toString("base64"),
   medal: templatePng.toString("base64"),
+  medal2: Buffer.concat([png, Buffer.from("medal-2")]).toString("base64"),
+  medal3: Buffer.concat([png, Buffer.from("medal-3")]).toString("base64"),
 };
 const input = {
   id: "550e8400-e29b-41d4-a716-446655440000", name: "demo", skill: "running",
@@ -36,7 +38,7 @@ beforeEach(() => {
 
 describe("generateAndSaveImages", () => {
   it.each([0, 0.499999, 0.5, 0.999999])("乱数 %s に応じてcharacterのプロンプトと見本を一緒に選ぶ", async (random) => {
-    vi.mocked(Math.random).mockReturnValue(random);
+    vi.mocked(Math.random).mockReturnValueOnce(random).mockReturnValue(0);
 
     await generateAndSaveImages(input);
 
@@ -67,8 +69,27 @@ describe("generateAndSaveImages", () => {
 背景は透過してください。
 性格は${input.personality}です。必ず妖怪キャラクター画像を生成してください。画像とは別に、テキスト部分には性格に合うスキル名だけを返してください。`);
     }
-    expect(Math.random).toHaveBeenCalledTimes(1);
+    expect(Math.random).toHaveBeenCalledTimes(2);
     expect(bodies[1].input[0].content[2].text).toContain("2枚目のメダル");
+  });
+
+  it.each([
+    [0, "medal"], [1 / 3 - 0.000001, "medal"],
+    [1 / 3, "medal2"], [2 / 3 - 0.000001, "medal2"],
+    [2 / 3, "medal3"], [0.999999, "medal3"],
+  ] as const)("メダル用の乱数 %s で選んだ %s だけを送信する", async (random, referenceKind) => {
+    vi.mocked(Math.random).mockReturnValueOnce(0.5).mockReturnValueOnce(random);
+    await generateAndSaveImages(input);
+    expect(Math.random).toHaveBeenCalledTimes(2);
+    expect(loadReferenceImage).toHaveBeenNthCalledWith(1, "character2");
+    expect(loadReferenceImage).toHaveBeenNthCalledWith(2, referenceKind);
+    expect(loadReferenceImage).toHaveBeenCalledTimes(2);
+    const bodies = vi.mocked(fetch).mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
+    expect(bodies[1].input[0].content).toEqual([
+      { type: "input_image", image_url: `data:image/png;base64,${png.toString("base64")}` },
+      { type: "input_image", image_url: `data:image/png;base64,${characterTemplates[referenceKind]}` },
+      { type: "input_text", text: expect.stringContaining("2枚目のメダル") },
+    ]);
   });
 
   it("OpenAIのエラー詳細とリクエストIDを記録し、既存のエラーを返す", async () => {
@@ -190,14 +211,19 @@ describe("generateAndSaveImages", () => {
     expect(uploadImage).not.toHaveBeenCalled();
   });
 
-  it("メダル元画像を読み込めなければメダル生成を呼ばずnullで継続する", async () => {
+  it.each([
+    [0, "medal"], [1 / 3, "medal2"], [2 / 3, "medal3"],
+  ] as const)("%s で選んだ %s を読み込めなければメダル生成を呼ばずnullで継続する", async (random, referenceKind) => {
+    vi.mocked(Math.random).mockReturnValueOnce(0).mockReturnValueOnce(random);
     vi.mocked(loadReferenceImage).mockImplementation(async (kind) => {
-      if (kind === "medal") throw new Error("missing template");
+      if (kind === referenceKind) throw new Error("missing template");
       return characterTemplates[kind];
     });
     const result = await generateAndSaveImages(input);
     expect(result.medalFilename).toBeNull();
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(loadReferenceImage).toHaveBeenNthCalledWith(2, referenceKind);
+    expect(loadReferenceImage).toHaveBeenCalledTimes(2);
     expect(uploadImage).toHaveBeenCalledExactlyOnceWith(`${input.id}.png`, png, "image/png", expect.any(AbortSignal));
   });
 

@@ -6,6 +6,8 @@ const REFERENCE_IMAGE_PATHS = {
   character: resolve(__dirname, "../../src/lib/reference-images/character.png"),
   character2: resolve(__dirname, "../../src/lib/reference-images/character-2.png"),
   medal: resolve(__dirname, "../../src/lib/reference-images/medal.png"),
+  medal2: resolve(__dirname, "../../src/lib/reference-images/medal-2.png"),
+  medal3: resolve(__dirname, "../../src/lib/reference-images/medal-3.png"),
 } as const;
 
 export async function loadReferenceImage(kind: keyof typeof REFERENCE_IMAGE_PATHS): Promise<string> {

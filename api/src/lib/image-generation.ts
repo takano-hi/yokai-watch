@@ -28,6 +28,8 @@ const IMAGE_PROMPTS = {
         "2枚目のメダルの形・枠・背景・配色・装飾はそのまま使ってください。"
 };
 
+const MEDAL_REFERENCE_IMAGES = ["medal", "medal2", "medal3"] as const;
+
 type OutputItem = { type: string; result?: string; content?: { text?: string }[] };
 type OpenAIResponse = { output?: OutputItem[]; error?: unknown };
 type Input = { id: string; name: string; skill: string; personality: string; bytes: Buffer; mimeType: string };
@@ -111,7 +113,8 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
         characterTemplate.prompt(input.name, input.personality),
       generationSignal, referenceImage,
     );
-    const medal = await loadReferenceImage("medal").then((referenceImage) => callOpenAI(
+    const medalReference = MEDAL_REFERENCE_IMAGES[Math.floor(Math.random() * MEDAL_REFERENCE_IMAGES.length)];
+    const medal = await loadReferenceImage(medalReference).then((referenceImage) => callOpenAI(
       { ...input, bytes: character.bytes, mimeType: "image/png" },
       IMAGE_PROMPTS.medal, generationSignal, referenceImage,
     )).catch((error: unknown) => {
