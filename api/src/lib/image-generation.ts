@@ -50,7 +50,7 @@ async function callOpenAI(input: Input, prompt: string, signal: AbortSignal, ref
         { type: "input_text", text: prompt },
       ] }],
       tools: [{
-        type: "image_generation", model: "gpt-image-2.5-flare", quality: "low", size: "816x816",
+        type: "image_generation", model: "gpt-image-2.5-sunburst", size: "816x816",
         background: "transparent", output_format: "png",
       }],
     }),
