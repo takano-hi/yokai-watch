@@ -19,6 +19,7 @@ const generated = () => Response.json({ output: [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(Math, "random").mockReturnValue(0);
   vi.stubEnv("CHATGPT_API_KEY", "test-key");
   vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => generated()));
   vi.mocked(uploadImage).mockResolvedValue(undefined);
@@ -29,6 +30,23 @@ beforeEach(() => {
 });
 
 describe("generateAndSaveImages", () => {
+  it.each([0, 0.499999, 0.5, 0.999999])("乱数 %s に応じてcharacterのプロンプトを選ぶ", async (random) => {
+    vi.mocked(Math.random).mockReturnValue(random);
+
+    await generateAndSaveImages(input);
+
+    const bodies = vi.mocked(fetch).mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
+    const characterPrompt = bodies[0].input[0].content[1].text;
+    if (random < 0.5) {
+      expect(characterPrompt).toContain("この人を妖怪ウォッチの妖怪風にしてください。");
+      expect(characterPrompt).toContain(input.personality);
+    } else {
+      expect(characterPrompt).toBe("");
+    }
+    expect(Math.random).toHaveBeenCalledTimes(1);
+    expect(bodies[1].input[0].content[2].text).toContain("2枚目のメダル");
+  });
+
   it("OpenAIのエラー詳細とリクエストIDを記録し、既存のエラーを返す", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: {
       message: "Unsupported background", param: "tools[0].background", code: "invalid_value",

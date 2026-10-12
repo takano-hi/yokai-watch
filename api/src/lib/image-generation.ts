@@ -3,11 +3,14 @@ import { getR2Config, uploadImage } from "./r2";
 import { loadReferenceImage } from "./reference-images";
 
 const IMAGE_PROMPTS = {
-  character: (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
+  character: [
+    (name: string, personality: string) => `この人を妖怪ウォッチの妖怪風にしてください。
         足はお化けみたいにしてください。
         入力された名前をそのまま妖怪の名前にしてください。
         画像には妖怪だけを含め、背景は透過してください。
         この子は${name}です。性格は${personality}です。この性格を元にスキルをテキストで返してください。`,
+    () => "", // 2つ目のプロンプト（後で記入）
+  ],
   medal: "1枚目の画像の妖怪キャラクターを、2枚目のメダル元画像の中央にはめ込んでください。" +
     "顔・髪型・体型・配色・服装・足の形などのデザインを変更せず、入力画像と同一のキャラクターとして描いてください。" +
     "別のデザインに描き直したり、新しい要素を加えたりしないでください。" +
@@ -91,7 +94,8 @@ export async function generateAndSaveImages(input: Input, requestSignal = new Ab
   let stage = "generation";
   const started = Date.now();
   try {
-    const character = await callOpenAI(input, IMAGE_PROMPTS.character(input.name, input.personality), generationSignal);
+    const characterPrompt = IMAGE_PROMPTS.character[Math.floor(Math.random() * IMAGE_PROMPTS.character.length)];
+    const character = await callOpenAI(input, characterPrompt(input.name, input.personality), generationSignal);
     const medal = await loadReferenceImage("medal").then((referenceImage) => callOpenAI(
       { ...input, bytes: character.bytes, mimeType: "image/png" },
       IMAGE_PROMPTS.medal, generationSignal, referenceImage,
