@@ -41,7 +41,14 @@ describe("generateAndSaveImages", () => {
       expect(characterPrompt).toContain("この人を妖怪ウォッチの妖怪風にしてください。");
       expect(characterPrompt).toContain(input.personality);
     } else {
-      expect(characterPrompt).toBe("");
+      expect(characterPrompt).toBe(`この人を妖怪ウォッチの妖怪風にしてください。
+足はお化けにみたいにしてください。
+入力された名前をそのまま妖怪の名前にしてください。
+入力されたこの人を表した言葉をそのまま性格にしてください。
+入力された一言を用いてスキルを作ってください。
+それ以外は出力しないでください。
+背景は透過してください。
+この子はそらちゃんです。　性格は恥ずかしがりやです`);
     }
     expect(Math.random).toHaveBeenCalledTimes(1);
     expect(bodies[1].input[0].content[2].text).toContain("2枚目のメダル");
